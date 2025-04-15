@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D OBJ Viewer - Computação Gráfica</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div class="header-content">
+          <div class="logo">
+            <span class="material-icons logo-icon">view_in_ar</span>
+            <h1>3D OBJ Viewer</h1>
+          </div>
+          <nav class="nav-placeholder">
+            <a href="#" class="nav-item active">Visualizador</a>
+            <a href="#" class="nav-item">Transformações</a>
+            <a href="#" class="nav-item">Texturas</a>
+          </nav>
+        </div>
+      </header>
+
+      <main>
+        <div class="sidebar">
+          <div class="info-card" id="modelInfo">
+            <h3>Informações do Modelo</h3>
+            <div class="info-row">
+              <span class="info-label">Status:</span>
+              <span class="info-value">Nenhum modelo carregado</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="content">
+          <div class="toolbar">
+            <div class="toolbar-group">
+              <span class="toolbar-title">Arquivo</span>
+              <div class="file-input-container">
+                <input
+                  type="file"
+                  id="fileInput"
+                  accept=".obj"
+                  class="file-input"
+                />
+                <label for="fileInput" class="file-input-label btn-primary">
+                  <span class="material-icons">file_upload</span>
+                  Carregar Modelo OBJ
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="canvas-container">
+            <canvas id="glCanvas"></canvas>
+            <div id="loadingIndicator" class="loading-indicator hidden">
+              <div class="loading-spinner"></div>
+              Carregando modelo...
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <footer>
+        <p>Visualizador 3D WebGL &copy; 2025 - Projeto de Computação Gráfica</p>
+      </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/matrix.js"></script>
+    <script src="js/objParser.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
