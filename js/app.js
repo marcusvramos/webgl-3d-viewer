@@ -8,6 +8,7 @@ class App {
     this.fileInput = document.getElementById("fileInput");
     this.modelInfo = document.getElementById("modelInfo");
     this.loadingIndicator = document.getElementById("loadingIndicator");
+    this.transformInfo = document.getElementById("transformInfo");
 
     // Estado da aplicação
     this.currentModel = null;
@@ -36,7 +37,93 @@ class App {
     // Carregar arquivo OBJ
     this.fileInput.addEventListener("change", (e) => this._handleFileSelect(e));
 
-    // Eventos futuros serão adicionados aqui
+    // Botão de reset
+    const resetBtn = document.getElementById("resetBtn");
+    if (resetBtn) {
+      resetBtn.addEventListener("click", () => this._resetTransformations());
+    }
+
+    // Botão de limpar (renomeado de resetViewBtn para clearBtn)
+    const clearBtn = document.getElementById("clearBtn");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => this._clearModel());
+    }
+
+    // Gerenciamento do modal de instruções
+    const helpBtn = document.getElementById("helpBtn");
+    const modal = document.getElementById("instructionsModal");
+    const closeModal = document.querySelector(".close-modal");
+
+    if (helpBtn && modal) {
+      helpBtn.addEventListener("click", () => {
+        modal.classList.remove("hidden");
+      });
+    }
+
+    if (closeModal && modal) {
+      closeModal.addEventListener("click", () => {
+        modal.classList.add("hidden");
+      });
+
+      // Fechar modal ao clicar fora dele
+      window.addEventListener("click", (e) => {
+        if (e.target === modal) {
+          modal.classList.add("hidden");
+        }
+      });
+
+      // Fechar modal com a tecla ESC
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && !modal.classList.contains("hidden")) {
+          modal.classList.add("hidden");
+        }
+      });
+    }
+  }
+
+  /**
+   * Reseta as transformações para o estado inicial
+   * @private
+   */
+  _resetTransformations() {
+    if (!this.currentModel) return;
+
+    // Resetar a matriz de transformação no renderer
+    this.renderer.transformMatrix = Matrix.identity();
+
+    // Renderizar novamente
+    this.renderer.render();
+  }
+
+  /**
+   * Limpa o modelo atual da tela
+   * @private
+   */
+  _clearModel() {
+    if (!this.currentModel) return;
+
+    // Limpar referências do modelo
+    this.currentModel = null;
+
+    // Limpar buffers no renderer
+    if (this.renderer.buffers.vertex) {
+      this.renderer.gl.deleteBuffer(this.renderer.buffers.vertex);
+    }
+    if (this.renderer.buffers.index) {
+      this.renderer.gl.deleteBuffer(this.renderer.buffers.index);
+    }
+
+    this.renderer.buffers = {};
+    this.renderer.modelData = null;
+    this.renderer.indexCount = 0;
+
+    // Limpar o canvas
+    this.renderer.gl.clear(
+      this.renderer.gl.COLOR_BUFFER_BIT | this.renderer.gl.DEPTH_BUFFER_BIT
+    );
+
+    // Atualizar a interface para mostrar que não há modelo
+    this._showWelcomeMessage();
   }
 
   /**

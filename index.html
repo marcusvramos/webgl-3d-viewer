@@ -22,11 +22,7 @@
             <span class="material-icons logo-icon">view_in_ar</span>
             <h1>3D OBJ Viewer</h1>
           </div>
-          <nav class="nav-placeholder">
-            <a href="#" class="nav-item active">Visualizador</a>
-            <a href="#" class="nav-item">Transformações</a>
-            <a href="#" class="nav-item">Texturas</a>
-          </nav>
+          <!-- Removido o nav-placeholder não utilizado -->
         </div>
       </header>
 
@@ -39,12 +35,24 @@
               <span class="info-value">Nenhum modelo carregado</span>
             </div>
           </div>
+          <div class="info-card" id="controls">
+            <h3>Controles</h3>
+            <div class="controls-row">
+              <button id="helpBtn" class="btn btn-help">
+                <span class="material-icons">help_outline</span>
+                Como usar
+              </button>
+              <button id="resetBtn" class="btn btn-primary">
+                <span class="material-icons">restart_alt</span>
+                Resetar
+              </button>
+            </div>
+          </div>
         </div>
 
         <div class="content">
           <div class="toolbar">
             <div class="toolbar-group">
-              <span class="toolbar-title">Arquivo</span>
               <div class="file-input-container">
                 <input
                   type="file"
@@ -57,6 +65,10 @@
                   Carregar Modelo OBJ
                 </label>
               </div>
+              <button id="clearBtn" class="btn">
+                <span class="material-icons">delete</span>
+                Limpar
+              </button>
             </div>
           </div>
 
@@ -71,8 +83,81 @@
       </main>
 
       <footer>
-        <p>Visualizador 3D WebGL &copy; 2025 - Projeto de Computação Gráfica</p>
+        <p>Visualizador 3D WebGL © 2025 - Projeto de Computação Gráfica</p>
       </footer>
+    </div>
+
+    <!-- Modal de instruções -->
+    <div id="instructionsModal" class="modal hidden">
+      <div class="modal-content">
+        <span class="close-modal">&times;</span>
+        <h2>Instruções de Uso</h2>
+
+        <div class="instruction-section">
+          <div class="instruction-icon">
+            <span class="material-icons">open_with</span>
+          </div>
+          <div class="instruction-text">
+            <h3>Translação</h3>
+            <ul>
+              <li>
+                <strong>Botão direito + arrastar:</strong> Mover nos eixos X/Y
+              </li>
+              <li>
+                <strong>Tecla Z + botão direito + arrastar:</strong> Mover no
+                eixo Z
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="instruction-section">
+          <div class="instruction-icon">
+            <span class="material-icons">rotate_right</span>
+          </div>
+          <div class="instruction-text">
+            <h3>Rotação</h3>
+            <ul>
+              <li>
+                <strong>Botão esquerdo + arrastar:</strong> Rotacionar no eixo Z
+              </li>
+              <li>
+                <strong>Ctrl + botão esquerdo + arrastar:</strong> Rotacionar
+                nos eixos X/Y
+              </li>
+              <li>
+                <strong>Tecla X + botão esquerdo + arrastar:</strong> Rotacionar
+                no eixo X
+              </li>
+              <li>
+                <strong>Tecla Y + botão esquerdo + arrastar:</strong> Rotacionar
+                no eixo Y
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="instruction-section">
+          <div class="instruction-icon">
+            <span class="material-icons">zoom_in</span>
+          </div>
+          <div class="instruction-text">
+            <h3>Escala</h3>
+            <ul>
+              <li><strong>Scroll do mouse:</strong> Escala uniforme</li>
+              <li>
+                <strong>Tecla X + scroll:</strong> Escala apenas no eixo X
+              </li>
+              <li>
+                <strong>Tecla Y + scroll:</strong> Escala apenas no eixo Y
+              </li>
+              <li>
+                <strong>Tecla Z + scroll:</strong> Escala apenas no eixo Z
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Scripts -->
