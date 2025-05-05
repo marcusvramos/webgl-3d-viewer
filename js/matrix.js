@@ -118,6 +118,131 @@ const Matrix = {
   },
 
   /**
+   * Cria uma matriz de projeção ortográfica para vista frontal (XY)
+   * @returns {Float32Array} Matriz de projeção ortográfica
+   */
+  orthographicFront: function () {
+    // Vista frontal (XY): Preserva X e Y, comprime Z
+    return new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
+  },
+
+  /**
+   * Cria uma matriz de projeção ortográfica para vista superior (XZ)
+   * @returns {Float32Array} Matriz de projeção ortográfica
+   */
+  orthographicTop: function () {
+    // Vista superior (XZ): Rotação em torno do eixo X por -90 graus
+    const angle = -Math.PI / 2;
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+
+    return new Float32Array([1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1]);
+  },
+
+  /**
+   * Cria uma matriz de projeção ortográfica para vista lateral (YZ)
+   * @returns {Float32Array} Matriz de projeção ortográfica
+   */
+  orthographicSide: function () {
+    // Vista lateral (YZ): Rotação em torno do eixo Y por 90 graus
+    const angle = Math.PI / 2;
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+
+    return new Float32Array([0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1]);
+  },
+
+  /**
+   * Cria uma matriz de projeção em perspectiva (1 ponto de fuga)
+   * @param {number} fovRadians - Campo de visão em radianos
+   * @param {number} aspect - Razão largura/altura do canvas
+   * @param {number} near - Plano de corte próximo
+   * @param {number} far - Plano de corte distante
+   * @returns {Float32Array} Matriz de projeção em perspectiva
+   */
+  perspective: function (fovRadians, aspect, near, far) {
+    const f = Math.tan(Math.PI * 0.5 - 0.5 * fovRadians);
+    const rangeInv = 1.0 / (near - far);
+
+    return new Float32Array([
+      f / aspect,
+      0,
+      0,
+      0,
+      0,
+      f,
+      0,
+      0,
+      0,
+      0,
+      (near + far) * rangeInv,
+      -1,
+      0,
+      0,
+      near * far * rangeInv * 2,
+      0,
+    ]);
+  },
+
+  /**
+   * Cria uma matriz de projeção oblíqua do tipo Cavaleira
+   * Ângulo de 45° com fator de redução 1
+   * @returns {Float32Array} Matriz de projeção cavaleira
+   */
+  obliqueCavalier: function () {
+    const alpha = Math.PI / 4; // 45 graus
+    const factor = 1.0; // Fator de redução de 1 (sem redução)
+
+    return new Float32Array([
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      factor * Math.cos(alpha),
+      factor * Math.sin(alpha),
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+    ]);
+  },
+
+  /**
+   * Cria uma matriz de projeção oblíqua do tipo Cabinet
+   * Ângulo de 45° com fator de redução 0.5
+   * @returns {Float32Array} Matriz de projeção cabinet
+   */
+  obliqueCabinet: function () {
+    const alpha = Math.PI / 4; // 45 graus
+    const factor = 0.5; // Fator de redução de 0.5 (metade da profundidade)
+
+    return new Float32Array([
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      factor * Math.cos(alpha),
+      factor * Math.sin(alpha),
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+    ]);
+  },
+
+  /**
    * Aplicar transformação a vértices
    * @param {Float32Array} vertices - Array de vértices
    * @param {Float32Array} matrix - Matriz de transformação

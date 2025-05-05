@@ -15,7 +15,7 @@ class Renderer {
     // Matriz de transformação acumulada
     this.transformMatrix = Matrix.identity();
 
-    // Matriz de projeção (adicionada)
+    // Matriz de projeção (inicialmente identidade)
     this.projectionMatrix = Matrix.identity();
 
     // Estado da interação
@@ -214,13 +214,15 @@ class Renderer {
    * @private
    */
   _initShaders() {
-    // Vertex shader com suporte a transformação
+    // Vertex shader com suporte a transformação e projeção
     const vsSource = `
       attribute vec3 aPosition;
       uniform mat4 uTransformMatrix;
+      uniform mat4 uProjectionMatrix;
       
       void main() {
-          gl_Position = uTransformMatrix * vec4(aPosition, 1.0);
+          // Aplicar transformação do modelo e depois a projeção
+          gl_Position = uProjectionMatrix * uTransformMatrix * vec4(aPosition, 1.0);
           gl_PointSize = 3.0;
       }
     `;
@@ -263,6 +265,10 @@ class Renderer {
     this.program.uTransformMatrix = this.gl.getUniformLocation(
       this.program,
       "uTransformMatrix"
+    );
+    this.program.uProjectionMatrix = this.gl.getUniformLocation(
+      this.program,
+      "uProjectionMatrix"
     );
 
     this.gl.useProgram(this.program);
@@ -315,8 +321,9 @@ class Renderer {
     // Armazenar referência aos dados do modelo
     this.modelData = modelData;
 
-    // Resetar matriz de transformação
+    // Resetar matrizes
     this.transformMatrix = Matrix.identity();
+    this.projectionMatrix = Matrix.identity();
 
     // Criar buffer de vértices
     this.buffers.vertex = gl.createBuffer();
@@ -371,6 +378,13 @@ class Renderer {
       this.program.uTransformMatrix,
       false,
       this.transformMatrix
+    );
+    
+    // Definir a matriz de projeção no shader
+    gl.uniformMatrix4fv(
+      this.program.uProjectionMatrix,
+      false,
+      this.projectionMatrix
     );
 
     // Desenhar arestas
