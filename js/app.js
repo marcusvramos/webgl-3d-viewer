@@ -56,47 +56,55 @@ class App {
     const frontView = document.getElementById("frontView");
     const topView = document.getElementById("topView");
     const sideView = document.getElementById("sideView");
-    
+
     if (frontView) {
-      frontView.addEventListener("click", () => this._setProjection("frontView"));
+      frontView.addEventListener("click", () =>
+        this._setProjection("frontView")
+      );
     }
-    
+
     if (topView) {
       topView.addEventListener("click", () => this._setProjection("topView"));
     }
-    
+
     if (sideView) {
       sideView.addEventListener("click", () => this._setProjection("sideView"));
     }
-    
+
     // Eventos de projeção perspectiva
     const perspectiveView = document.getElementById("perspectiveView");
     if (perspectiveView) {
-      perspectiveView.addEventListener("click", () => this._setProjection("perspective"));
+      perspectiveView.addEventListener("click", () =>
+        this._setProjection("perspective")
+      );
     }
-    
+
     // Slider de FOV (Field of View)
     if (this.fovSlider) {
       this.fovSlider.addEventListener("input", () => {
         const fov = this.fovSlider.value;
         this.fovValue.textContent = `${fov}°`;
-        
+
         if (this.currentProjection === "perspective") {
           this._setProjection("perspective");
         }
       });
     }
-    
+
     // Eventos de projeção oblíqua
     const cavalierView = document.getElementById("cavalierView");
     const cabinetView = document.getElementById("cabinetView");
-    
+
     if (cavalierView) {
-      cavalierView.addEventListener("click", () => this._setProjection("cavalier"));
+      cavalierView.addEventListener("click", () =>
+        this._setProjection("cavalier")
+      );
     }
-    
+
     if (cabinetView) {
-      cabinetView.addEventListener("click", () => this._setProjection("cabinet"));
+      cabinetView.addEventListener("click", () =>
+        this._setProjection("cabinet")
+      );
     }
 
     // Gerenciamento do modal de instruções
@@ -129,6 +137,15 @@ class App {
         }
       });
     }
+
+    const toggleAxesBtn = document.getElementById("toggleAxesBtn");
+    if (toggleAxesBtn) {
+      toggleAxesBtn.addEventListener("click", () => {
+        this.renderer.showAxes = !this.renderer.showAxes;
+        toggleAxesBtn.classList.toggle("btn-accent", this.renderer.showAxes);
+        this.renderer.render();
+      });
+    }
   }
 
   /**
@@ -138,64 +155,67 @@ class App {
    */
   _setProjection(projectionType) {
     if (!this.currentModel) return;
-    
+
     this.currentProjection = projectionType;
-    
+
     // Resetar a matriz de transformação no renderer
     this.renderer.transformMatrix = Matrix.identity();
-    
+
     // Aplicar projeção específica
     switch (projectionType) {
       case "frontView":
         // Vista frontal (XY) - Sem alteração no eixo Z
         this.renderer.projectionMatrix = Matrix.orthographicFront();
         break;
-        
+
       case "topView":
         // Vista superior (XZ) - Rotacionar em X para olhar de cima
         this.renderer.projectionMatrix = Matrix.orthographicTop();
         break;
-        
+
       case "sideView":
         // Vista lateral (YZ) - Rotacionar em Y para olhar da lateral
         this.renderer.projectionMatrix = Matrix.orthographicSide();
         break;
-        
+
       case "perspective":
         // Projeção de perspectiva com 1 ponto de fuga
         const fov = this.fovSlider ? parseFloat(this.fovSlider.value) : 60;
-        this.renderer.projectionMatrix = Matrix.perspective(fov * Math.PI / 180, 
-                                                           this.canvas.width / this.canvas.height, 
-                                                           0.1, 100);
-        
+        this.renderer.projectionMatrix = Matrix.perspective(
+          (fov * Math.PI) / 180,
+          this.canvas.width / this.canvas.height,
+          0.1,
+          100
+        );
+
         // Ajustar a posição para a perspectiva
         const translateBack = Matrix.translation(0, 0, -3);
         this.renderer.transformMatrix = translateBack;
         break;
-        
+
       case "cavalier":
         // Projeção cavaleira (ângulo de 45° com fator de redução 1)
         this.renderer.projectionMatrix = Matrix.obliqueCavalier();
         break;
-        
+
       case "cabinet":
         // Projeção cabinet (ângulo de 45° com fator de redução 0.5)
         this.renderer.projectionMatrix = Matrix.obliqueCabinet();
         break;
-        
+
       default:
         // Retornar à projeção padrão (não modificada)
         this.renderer.projectionMatrix = Matrix.identity();
         break;
     }
-    
+
     // Renderizar novamente com a nova projeção
     this.renderer.render();
-    
+
     // Atualizar interface para refletir a projeção atual
     this._updateProjectionInfo(projectionType);
   }
-  
+
   /**
    * Atualiza a informação de projeção na interface
    * @param {string} projectionType - Tipo de projeção atual
@@ -203,27 +223,39 @@ class App {
    */
   _updateProjectionInfo(projectionType) {
     // Remover classe 'active' de todos os botões de projeção
-    const buttons = document.querySelectorAll('.btn-projection');
-    buttons.forEach(button => {
-      button.classList.remove('active');
+    const buttons = document.querySelectorAll(".btn-projection");
+    buttons.forEach((button) => {
+      button.classList.remove("active");
     });
-    
+
     // Adicionar classe 'active' ao botão da projeção atual
-    let activeButtonId = '';
-    
+    let activeButtonId = "";
+
     switch (projectionType) {
-      case "frontView": activeButtonId = "frontView"; break;
-      case "topView": activeButtonId = "topView"; break;
-      case "sideView": activeButtonId = "sideView"; break;
-      case "perspective": activeButtonId = "perspectiveView"; break;
-      case "cavalier": activeButtonId = "cavalierView"; break;
-      case "cabinet": activeButtonId = "cabinetView"; break;
+      case "frontView":
+        activeButtonId = "frontView";
+        break;
+      case "topView":
+        activeButtonId = "topView";
+        break;
+      case "sideView":
+        activeButtonId = "sideView";
+        break;
+      case "perspective":
+        activeButtonId = "perspectiveView";
+        break;
+      case "cavalier":
+        activeButtonId = "cavalierView";
+        break;
+      case "cabinet":
+        activeButtonId = "cabinetView";
+        break;
     }
-    
+
     if (activeButtonId) {
       const activeButton = document.getElementById(activeButtonId);
       if (activeButton) {
-        activeButton.classList.add('active');
+        activeButton.classList.add("active");
       }
     }
   }
@@ -239,7 +271,7 @@ class App {
     this.renderer.transformMatrix = Matrix.identity();
     this.renderer.projectionMatrix = Matrix.identity();
     this.currentProjection = "none";
-    
+
     // Atualizar interface
     this._updateProjectionInfo("");
 
@@ -268,7 +300,7 @@ class App {
     this.renderer.buffers = {};
     this.renderer.modelData = null;
     this.renderer.indexCount = 0;
-    
+
     // Resetar matrizes
     this.renderer.transformMatrix = Matrix.identity();
     this.renderer.projectionMatrix = Matrix.identity();
@@ -328,6 +360,7 @@ class App {
 
         // Renderizar o modelo
         this.renderer.render();
+        this._setProjection("frontView");
       } catch (error) {
         console.error("Erro ao carregar o modelo:", error);
         alert(

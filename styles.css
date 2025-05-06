@@ -481,11 +481,22 @@ footer {
   color: var(--primary-color);
 }
 
-/* Botão de ajuda */
 .controls-row {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-content: center;
-  gap: 10px;
+}
+
+.controls-row .btn {
+  padding: 8px 14px;
+  font-size: 0.85rem; 
+  flex: 1 1 110px;
+  max-width: 140px;
+}
+
+.controls-row .material-icons {
+  font-size: 20px;
 }
 
 .btn-help {

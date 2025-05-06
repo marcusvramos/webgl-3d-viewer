@@ -7,6 +7,8 @@ class Renderer {
     this.gl = null;
     this.program = null;
     this.buffers = {};
+    this.showAxes = true;
+    this.axisBuffers = {};
 
     // Estado do modelo
     this.modelData = null;
@@ -57,6 +59,31 @@ class Renderer {
 
     // Adicionar listeners para eventos de mouse e teclado
     this._initEventListeners();
+    this._createAxisBuffers();
+  }
+
+  /**
+   * Cria buffers com 3 linhas coloridas para os eixos.
+   * (+X vermelho, +Y verde, +Z azul, todos de -1 a 1)
+   */
+  _createAxisBuffers() {
+    const gl = this.gl;
+
+    // posição xyz e cor rgb intercalados
+    const axisVertices = new Float32Array([
+      // X  (vermelho)
+      -1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0,
+      // Y  (verde)
+      0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0,
+      // Z  (azul)
+      0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 1,
+    ]);
+
+    this.axisBuffers.vbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.axisBuffers.vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, axisVertices, gl.STATIC_DRAW);
+
+    this.axisBuffers.vertexCount = 6; // 3 linhas → 6 vértices
   }
 
   /**
@@ -188,24 +215,18 @@ class Renderer {
     const scaleFactor = 1 - Math.sign(deltaY) * this.scaleSensitivity;
     let scaleMatrix;
 
-    if (keyPressed === "x") {
-      // Escala apenas em X
+    if (keyPressed === "z") {
+      scaleMatrix = Matrix.scaling(1, 1, scaleFactor);
+    } else if (keyPressed === "x") {
       scaleMatrix = Matrix.scaling(scaleFactor, 1, 1);
     } else if (keyPressed === "y") {
-      // Escala apenas em Y
       scaleMatrix = Matrix.scaling(1, scaleFactor, 1);
-    } else if (keyPressed === "z") {
-      // Escala apenas em Z
-      scaleMatrix = Matrix.scaling(1, 1, scaleFactor);
     } else {
-      // Escala uniforme
       scaleMatrix = Matrix.scaling(scaleFactor, scaleFactor, scaleFactor);
     }
 
-    // Aplicar à matriz acumulada
-    this.transformMatrix = Matrix.multiply(scaleMatrix, this.transformMatrix);
+    this.transformMatrix = Matrix.multiply(this.transformMatrix, scaleMatrix);
 
-    // Renderizar
     this.render();
   }
 
@@ -216,25 +237,27 @@ class Renderer {
   _initShaders() {
     // Vertex shader com suporte a transformação e projeção
     const vsSource = `
-      attribute vec3 aPosition;
-      uniform mat4 uTransformMatrix;
-      uniform mat4 uProjectionMatrix;
-      
-      void main() {
-          // Aplicar transformação do modelo e depois a projeção
-          gl_Position = uProjectionMatrix * uTransformMatrix * vec4(aPosition, 1.0);
-          gl_PointSize = 3.0;
-      }
-    `;
+  attribute vec3 aPosition;
+  attribute vec3 aColor;              
+  varying vec3 vColor;                
+  uniform mat4 uTransformMatrix;
+  uniform mat4 uProjectionMatrix;
 
-    // Fragment shader simplificado
+  void main() {
+      vColor = aColor;                
+      gl_Position = uProjectionMatrix * uTransformMatrix * vec4(aPosition, 1.0);
+      gl_PointSize = 3.0;
+  }
+`;
+
+    // FS – use a cor recebida
     const fsSource = `
-      precision mediump float;
-      
-      void main() {
-          gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-      }
-    `;
+  precision mediump float;
+  varying vec3 vColor;                 
+  void main() {
+      gl_FragColor = vec4(vColor, 1.0);
+  }
+`;
 
     // Criar e compilar shaders
     const vertexShader = this._createShader(this.gl.VERTEX_SHADER, vsSource);
@@ -248,6 +271,7 @@ class Renderer {
     this.gl.attachShader(this.program, vertexShader);
     this.gl.attachShader(this.program, fragmentShader);
     this.gl.linkProgram(this.program);
+    this.program.aColor = this.gl.getAttribLocation(this.program, "aColor");
 
     if (!this.gl.getProgramParameter(this.program, this.gl.LINK_STATUS)) {
       console.error(
@@ -372,23 +396,62 @@ class Renderer {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.vertex);
     gl.vertexAttribPointer(this.program.aPosition, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(this.program.aPosition);
+    gl.disableVertexAttribArray(this.program.aColor); // força cor fixa preta
+    gl.vertexAttrib3f(this.program.aColor, 0, 0, 0);
 
-    // Definir a matriz de transformação no shader
     gl.uniformMatrix4fv(
       this.program.uTransformMatrix,
       false,
       this.transformMatrix
     );
-    
-    // Definir a matriz de projeção no shader
     gl.uniformMatrix4fv(
       this.program.uProjectionMatrix,
       false,
       this.projectionMatrix
     );
-
-    // Desenhar arestas
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.buffers.index);
     gl.drawElements(gl.LINES, this.indexCount, gl.UNSIGNED_SHORT, 0);
+    if (this.showAxes) {
+      // 1) Bind do VBO de eixos
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.axisBuffers.vbo);
+
+      // 2) Posição intercalada: posição (3 floats) + cor (3 floats)
+      const stride = 6 * Float32Array.BYTES_PER_ELEMENT;
+      gl.vertexAttribPointer(
+        this.program.aPosition,
+        3,
+        gl.FLOAT,
+        false,
+        stride,
+        0
+      );
+      gl.enableVertexAttribArray(this.program.aPosition);
+
+      gl.vertexAttribPointer(
+        this.program.aColor,
+        3,
+        gl.FLOAT,
+        false,
+        stride,
+        3 * Float32Array.BYTES_PER_ELEMENT
+      );
+      gl.enableVertexAttribArray(this.program.aColor);
+
+      // 3) Use IDENTIDADE para o modelo ao desenhar os eixos
+      gl.uniformMatrix4fv(
+        this.program.uTransformMatrix,
+        false,
+        Matrix.identity()
+      );
+
+      // 4) Continua usando a mesma projeção
+      gl.uniformMatrix4fv(
+        this.program.uProjectionMatrix,
+        false,
+        this.projectionMatrix
+      );
+
+      // 5) Desenha as linhas dos eixos
+      gl.drawArrays(gl.LINES, 0, this.axisBuffers.vertexCount);
+    }
   }
 }

@@ -34,33 +34,54 @@
               <span class="info-value">Nenhum modelo carregado</span>
             </div>
           </div>
-          
+
           <!-- Nova seção de projeções -->
           <div class="info-card" id="projections">
             <h3>Projeções</h3>
             <div class="projection-options">
               <h4>Ortográficas</h4>
               <div class="button-group">
-                <button id="frontView" class="btn btn-projection">Frontal (XY)</button>
-                <button id="topView" class="btn btn-projection">Superior (XZ)</button>
-                <button id="sideView" class="btn btn-projection">Lateral (YZ)</button>
+                <button id="frontView" class="btn btn-projection">
+                  Frontal (XY)
+                </button>
+                <button id="topView" class="btn btn-projection">
+                  Superior (XZ)
+                </button>
+                <button id="sideView" class="btn btn-projection">
+                  Lateral (YZ)
+                </button>
               </div>
-              
+
               <h4>Perspectiva</h4>
               <div class="button-group">
-                <button id="perspectiveView" class="btn btn-projection">1 Ponto de Fuga</button>
-                <input type="range" id="fovSlider" min="30" max="120" value="60" class="slider" />
-                <label for="fovSlider">FOV: <span id="fovValue">60°</span></label>
+                <button id="perspectiveView" class="btn btn-projection">
+                  1 Ponto de Fuga
+                </button>
+                <input
+                  type="range"
+                  id="fovSlider"
+                  min="30"
+                  max="120"
+                  value="60"
+                  class="slider"
+                />
+                <label for="fovSlider"
+                  >FOV: <span id="fovValue">60°</span></label
+                >
               </div>
-              
+
               <h4>Oblíquas</h4>
               <div class="button-group">
-                <button id="cavalierView" class="btn btn-projection">Cavaleira</button>
-                <button id="cabinetView" class="btn btn-projection">Cabinet</button>
+                <button id="cavalierView" class="btn btn-projection">
+                  Cavaleira
+                </button>
+                <button id="cabinetView" class="btn btn-projection">
+                  Cabinet
+                </button>
               </div>
             </div>
           </div>
-          
+
           <div class="info-card" id="controls">
             <h3>Controles</h3>
             <div class="controls-row">
@@ -71,6 +92,10 @@
               <button id="resetBtn" class="btn btn-primary">
                 <span class="material-icons">restart_alt</span>
                 Resetar
+              </button>
+              <button id="toggleAxesBtn" class="btn">
+                <span class="material-icons">visibility</span>
+                Eixos
               </button>
             </div>
           </div>
@@ -183,18 +208,30 @@
             </ul>
           </div>
         </div>
-        
+
         <div class="instruction-section">
           <div class="instruction-icon">
             <span class="material-icons">view_in_ar</span>
           </div>
           <div class="instruction-text">
             <h3>Projeções</h3>
-            <p>Use os botões de projeção para alternar entre diferentes visualizações do modelo:</p>
+            <p>
+              Use os botões de projeção para alternar entre diferentes
+              visualizações do modelo:
+            </p>
             <ul>
-              <li><strong>Ortográficas:</strong> Vistas precisas sem distorção de perspectiva</li>
-              <li><strong>Perspectiva:</strong> Visualização realista com ponto de fuga</li>
-              <li><strong>Oblíquas:</strong> Projeções cavaleira e cabinet com diferentes ângulos</li>
+              <li>
+                <strong>Ortográficas:</strong> Vistas precisas sem distorção de
+                perspectiva
+              </li>
+              <li>
+                <strong>Perspectiva:</strong> Visualização realista com ponto de
+                fuga
+              </li>
+              <li>
+                <strong>Oblíquas:</strong> Projeções cavaleira e cabinet com
+                diferentes ângulos
+              </li>
             </ul>
           </div>
         </div>
