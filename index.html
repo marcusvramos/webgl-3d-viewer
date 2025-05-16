@@ -13,6 +13,13 @@
       href="https://fonts.googleapis.com/icon?family=Material+Icons"
       rel="stylesheet"
     />
+    <style>
+      .solzinho {
+        position: absolute;
+        pointer-events: none;
+        z-index: 10;
+      }
+    </style>
   </head>
   <body>
     <div class="container">
@@ -24,7 +31,6 @@
           </div>
         </div>
       </header>
-
       <main>
         <div class="sidebar">
           <div class="info-card" id="modelInfo">
@@ -34,8 +40,6 @@
               <span class="info-value">Nenhum modelo carregado</span>
             </div>
           </div>
-
-          <!-- Nova seção de projeções -->
           <div class="info-card" id="projections">
             <h3>Projeções</h3>
             <div class="projection-options">
@@ -51,7 +55,6 @@
                   Lateral (YZ)
                 </button>
               </div>
-
               <h4>Perspectiva</h4>
               <div class="button-group">
                 <button id="perspectiveView" class="btn btn-projection">
@@ -69,7 +72,6 @@
                   >FOV: <span id="fovValue">60°</span></label
                 >
               </div>
-
               <h4>Oblíquas</h4>
               <div class="button-group">
                 <button id="cavalierView" class="btn btn-projection">
@@ -81,7 +83,36 @@
               </div>
             </div>
           </div>
-
+          <div class="info-card" id="viewControls">
+            <h3>Visualização</h3>
+            <div>
+              <label>
+                <input type="checkbox" id="fillFaces" />
+                Preencher Faces
+              </label>
+            </div>
+            <div>
+              <label>
+                <input type="checkbox" id="enableLighting" />
+                Iluminação
+              </label>
+            </div>
+            <div>
+              <label>Tipo de iluminação:</label>
+              <select id="lightingType">
+                <option value="flat">Flat</option>
+                <option value="gouraud">Gouraud</option>
+                <option value="phong">Phong</option>
+              </select>
+            </div>
+            <div>
+              <label>Cor do preenchimento:</label>
+              <input type="color" id="faceColor" value="#b0b6de" />
+            </div>
+            <div style="margin-top: 10px; font-size: 12px; color: #666">
+              Dica: Arraste a luz mantendo pressionado <b>L</b> sobre o canvas
+            </div>
+          </div>
           <div class="info-card" id="controls">
             <h3>Controles</h3>
             <div class="controls-row">
@@ -100,7 +131,6 @@
             </div>
           </div>
         </div>
-
         <div class="content">
           <div class="toolbar">
             <div class="toolbar-group">
@@ -122,9 +152,9 @@
               </button>
             </div>
           </div>
-
-          <div class="canvas-container">
+          <div class="canvas-container" style="position: relative">
             <canvas id="glCanvas"></canvas>
+            <canvas id="solzinho" class="solzinho"></canvas>
             <div id="loadingIndicator" class="loading-indicator hidden">
               <div class="loading-spinner"></div>
               Carregando modelo...
@@ -132,113 +162,16 @@
           </div>
         </div>
       </main>
-
       <footer>
         <p>Visualizador 3D WebGL © 2025 - Projeto de Computação Gráfica</p>
       </footer>
     </div>
-
-    <!-- Modal de instruções -->
     <div id="instructionsModal" class="modal hidden">
       <div class="modal-content">
         <span class="close-modal">&times;</span>
         <h2>Instruções de Uso</h2>
-
-        <div class="instruction-section">
-          <div class="instruction-icon">
-            <span class="material-icons">open_with</span>
-          </div>
-          <div class="instruction-text">
-            <h3>Translação</h3>
-            <ul>
-              <li>
-                <strong>Botão direito + arrastar:</strong> Mover nos eixos X/Y
-              </li>
-              <li>
-                <strong>Tecla Z + botão direito + arrastar:</strong> Mover no
-                eixo Z
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="instruction-section">
-          <div class="instruction-icon">
-            <span class="material-icons">rotate_right</span>
-          </div>
-          <div class="instruction-text">
-            <h3>Rotação</h3>
-            <ul>
-              <li>
-                <strong>Botão esquerdo + arrastar:</strong> Rotacionar no eixo Z
-              </li>
-              <li>
-                <strong>Ctrl + botão esquerdo + arrastar:</strong> Rotacionar
-                nos eixos X/Y
-              </li>
-              <li>
-                <strong>Tecla X + botão esquerdo + arrastar:</strong> Rotacionar
-                no eixo X
-              </li>
-              <li>
-                <strong>Tecla Y + botão esquerdo + arrastar:</strong> Rotacionar
-                no eixo Y
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="instruction-section">
-          <div class="instruction-icon">
-            <span class="material-icons">zoom_in</span>
-          </div>
-          <div class="instruction-text">
-            <h3>Escala</h3>
-            <ul>
-              <li><strong>Scroll do mouse:</strong> Escala uniforme</li>
-              <li>
-                <strong>Tecla X + scroll:</strong> Escala apenas no eixo X
-              </li>
-              <li>
-                <strong>Tecla Y + scroll:</strong> Escala apenas no eixo Y
-              </li>
-              <li>
-                <strong>Tecla Z + scroll:</strong> Escala apenas no eixo Z
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="instruction-section">
-          <div class="instruction-icon">
-            <span class="material-icons">view_in_ar</span>
-          </div>
-          <div class="instruction-text">
-            <h3>Projeções</h3>
-            <p>
-              Use os botões de projeção para alternar entre diferentes
-              visualizações do modelo:
-            </p>
-            <ul>
-              <li>
-                <strong>Ortográficas:</strong> Vistas precisas sem distorção de
-                perspectiva
-              </li>
-              <li>
-                <strong>Perspectiva:</strong> Visualização realista com ponto de
-                fuga
-              </li>
-              <li>
-                <strong>Oblíquas:</strong> Projeções cavaleira e cabinet com
-                diferentes ângulos
-              </li>
-            </ul>
-          </div>
-        </div>
       </div>
     </div>
-
-    <!-- Scripts -->
     <script src="js/matrix.js"></script>
     <script src="js/objParser.js"></script>
     <script src="js/renderer.js"></script>
