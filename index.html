@@ -98,6 +98,18 @@
               </label>
             </div>
             <div>
+              <label>
+                <input type="checkbox" id="enableBackfaceCulling" checked />
+                Remover Faces Ocultas
+              </label>
+            </div>
+            <div>
+              <label>
+                <input type="checkbox" id="enableZBuffer" checked />
+                Z-Buffer
+              </label>
+            </div>
+            <div>
               <label>Tipo de iluminação:</label>
               <select id="lightingType">
                 <option value="flat">Flat</option>
@@ -110,7 +122,8 @@
               <input type="color" id="faceColor" value="#b0b6de" />
             </div>
             <div style="margin-top: 10px; font-size: 12px; color: #666">
-              Dica: Arraste a luz mantendo pressionado <b>L</b> sobre o canvas
+              <b>Dica:</b> Arraste a luz mantendo pressionado <b>L</b> sobre o
+              canvas
             </div>
           </div>
           <div class="info-card" id="controls">
@@ -170,6 +183,65 @@
       <div class="modal-content">
         <span class="close-modal">&times;</span>
         <h2>Instruções de Uso</h2>
+        <div class="instruction-section">
+          <div class="instruction-icon">
+            <span class="material-icons">mouse</span>
+          </div>
+          <div class="instruction-text">
+            <h3>Controles do Mouse</h3>
+            <ul>
+              <li><b>Botão Esquerdo:</b> Rotação (Z)</li>
+              <li><b>Botão Esquerdo + Ctrl:</b> Rotação livre</li>
+              <li><b>Botão Esquerdo + X:</b> Rotação no eixo X</li>
+              <li><b>Botão Esquerdo + Y:</b> Rotação no eixo Y</li>
+              <li><b>Botão Direito:</b> Translação XY</li>
+              <li><b>Botão Direito + Z:</b> Translação no eixo Z</li>
+              <li><b>Scroll:</b> Escala uniforme</li>
+              <li><b>Scroll + X/Y/Z:</b> Escala no eixo específico</li>
+            </ul>
+          </div>
+        </div>
+        <div class="instruction-section">
+          <div class="instruction-icon">
+            <span class="material-icons">wb_sunny</span>
+          </div>
+          <div class="instruction-text">
+            <h3>Controle de Iluminação</h3>
+            <ul>
+              <li><b>Segure L + Mova o mouse:</b> Posicionar luz XY</li>
+              <li><b>Segure L + Scroll:</b> Posicionar luz Z</li>
+              <li>Escolha entre iluminação Flat, Gouraud ou Phong</li>
+            </ul>
+          </div>
+        </div>
+        <div class="instruction-section">
+          <div class="instruction-icon">
+            <span class="material-icons">view_in_ar</span>
+          </div>
+          <div class="instruction-text">
+            <h3>Projeções</h3>
+            <ul>
+              <li><b>Ortográficas:</b> Frontal, Superior, Lateral</li>
+              <li><b>Perspectiva:</b> 1 ponto de fuga com FOV ajustável</li>
+              <li><b>Oblíquas:</b> Cavaleira e Cabinet</li>
+            </ul>
+          </div>
+        </div>
+        <div class="instruction-section">
+          <div class="instruction-icon">
+            <span class="material-icons">settings</span>
+          </div>
+          <div class="instruction-text">
+            <h3>Visualização</h3>
+            <ul>
+              <li>Ative/desative preenchimento de faces</li>
+              <li>Ative/desative iluminação</li>
+              <li>Ative/desative remoção de faces ocultas</li>
+              <li>Ative/desative Z-Buffer</li>
+              <li>Personalize a cor do modelo</li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
     <script src="js/matrix.js"></script>
