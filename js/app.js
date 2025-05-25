@@ -114,11 +114,28 @@ class App {
       });
     }
 
+    // Checkbox de wireframe
+    const wireframeCheckbox = document.getElementById("showWireframe");
+    if (wireframeCheckbox) {
+      wireframeCheckbox.addEventListener("change", (e) => {
+        this.renderer.showWireframe = e.target.checked;
+        this.renderer.render();
+      });
+    }
+
     // Checkbox de preenchimento de faces
     const fillFacesCheckbox = document.getElementById("fillFaces");
     if (fillFacesCheckbox) {
       fillFacesCheckbox.addEventListener("change", (e) => {
         this.renderer.fillFaces = e.target.checked;
+        // Automaticamente desativar wireframe quando preencher faces (opcional)
+        if (e.target.checked && this.renderer.lightingEnabled) {
+          const wireframeCheckbox = document.getElementById("showWireframe");
+          if (wireframeCheckbox) {
+            wireframeCheckbox.checked = false;
+            this.renderer.showWireframe = false;
+          }
+        }
         this.renderer.render();
       });
     }
@@ -128,6 +145,14 @@ class App {
     if (lightingCheckbox) {
       lightingCheckbox.addEventListener("change", (e) => {
         this.renderer.lightingEnabled = e.target.checked;
+        // Automaticamente ativar preenchimento de faces quando ativar iluminação
+        if (e.target.checked) {
+          const fillFacesCheckbox = document.getElementById("fillFaces");
+          if (fillFacesCheckbox && !fillFacesCheckbox.checked) {
+            fillFacesCheckbox.checked = true;
+            this.renderer.fillFaces = true;
+          }
+        }
         this.renderer.render();
       });
     }
@@ -304,7 +329,7 @@ class App {
     if (this.renderer.zBuffer)
       this.renderer.zBuffer.fill(Number.POSITIVE_INFINITY);
 
-    // Atualize a tela para mostrar “vazio”
+    // Atualize a tela para mostrar "vazio"
     this.renderer.render();
   }
 

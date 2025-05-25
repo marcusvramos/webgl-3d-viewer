@@ -1,4 +1,4 @@
-// matrix.js
+// matrix.js - Corrigido para preservar profundidade em todas as projeções
 
 const Matrix = {
   identity: function () {
@@ -80,11 +80,11 @@ const Matrix = {
   },
 
   /**
-   * CORRIGIDO: Matriz de projeção ortográfica para vista frontal (XY)
-   * Preserva Z para o Z-buffering.
+   * Matriz de projeção ortográfica para vista frontal (XY)
+   * Preserva Z para o Z-buffering
    */
   orthographicFront: function () {
-    // Vista frontal (XY): Preserva X, Y e Z (para profundidade)
+    // Vista frontal (XY): Preserva X, Y e Z para profundidade
     return new Float32Array([
       1,
       0,
@@ -97,53 +97,7 @@ const Matrix = {
       0,
       0,
       1,
-      0, // Modificado: Z não é mais zerado, permitindo Z-buffer
-      0,
-      0,
-      0,
-      1,
-    ]);
-  },
-
-  orthographicTop: function () {
-    // Vista superior (XZ): Rotação em torno do eixo X por -90 graus
-    // Original Y -> -Z', Original Z -> Y'
-    return new Float32Array([
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      1,
-      0, // Y do mundo mapeado para Z da tela (com inversão implícita na transformação para tela)
-      0,
-      -1,
-      0,
-      0, // Z do mundo mapeado para -Y da tela
-      0,
-      0,
-      0,
-      1,
-    ]);
-  },
-
-  orthographicSide: function () {
-    // Vista lateral (YZ): Rotação em torno do eixo Y por 90 graus
-    // Original X -> Z', Original Z -> -X'
-    return new Float32Array([
-      0,
-      0,
-      -1,
-      0, // X do mundo mapeado para -Z da tela
-      0,
-      1,
-      0,
-      0,
-      1,
-      0,
-      0,
-      0, // Z do mundo mapeado para X da tela
+      0, // Z preservado
       0,
       0,
       0,
@@ -152,18 +106,67 @@ const Matrix = {
   },
 
   /**
-   * CORRIGIDO: Matriz de projeção em perspectiva (1 ponto de fuga)
-   * Garante que w_clip = -z_eye e mapeamento de profundidade correto.
+   * Matriz de projeção ortográfica para vista superior (XZ)
+   * Rotação para olhar de cima
+   */
+  orthographicTop: function () {
+    // Vista superior (XZ): Y aponta para cima, Z aponta para frente
+    // Trocar Y com Z e inverter para correta orientação
+    return new Float32Array([
+      1,
+      0,
+      0,
+      0, // X permanece X
+      0,
+      0,
+      -1,
+      0, // Z negativo vira Y
+      0,
+      1,
+      0,
+      0, // Y vira Z
+      0,
+      0,
+      0,
+      1,
+    ]);
+  },
+
+  /**
+   * Matriz de projeção ortográfica para vista lateral (YZ)
+   * Rotação para olhar de lado
+   */
+  orthographicSide: function () {
+    // Vista lateral (YZ): X aponta para dentro, Y permanece Y
+    // Trocar X com Z e inverter para correta orientação
+    return new Float32Array([
+      0,
+      0,
+      1,
+      0, // Z vira X
+      0,
+      1,
+      0,
+      0, // Y permanece Y
+      -1,
+      0,
+      0,
+      0, // X negativo vira Z
+      0,
+      0,
+      0,
+      1,
+    ]);
+  },
+
+  /**
+   * Matriz de projeção em perspectiva (1 ponto de fuga)
+   * Implementação correta com preservação de profundidade
    */
   perspective: function (fovRadians, aspect, near, far) {
-    const f = Math.tan(Math.PI * 0.5 - 0.5 * fovRadians); // cot(fov/2)
-    const rangeInv = 1.0 / (near - far); //  1 / (N-F)
+    const f = Math.tan(Math.PI * 0.5 - 0.5 * fovRadians);
+    const rangeInv = 1.0 / (near - far);
 
-    // Matriz de perspectiva padrão (OpenGL like)
-    // P22 = (N+F)/(N-F), P23 = (2NF)/(N-F), P32 = -1
-    // Os índices para Float32Array são linha por linha:
-    // m[10] é P_22, m[11] é P_23
-    // m[14] é P_32
     return new Float32Array([
       f / aspect,
       0,
@@ -176,17 +179,17 @@ const Matrix = {
       0,
       0,
       (near + far) * rangeInv,
-      near * far * rangeInv * 2, // P22, P23
-      0,
-      0,
       -1,
-      0, // P32, P33
+      0,
+      0,
+      near * far * rangeInv * 2,
+      0,
     ]);
   },
 
   /**
-   * CORRIGIDO: Matriz de projeção oblíqua do tipo Cavaleira
-   * Aplica cisalhamento em X e Y com base em Z.
+   * Matriz de projeção oblíqua do tipo Cavaleira
+   * Aplica cisalhamento em X e Y baseado em Z
    */
   obliqueCavalier: function () {
     const alpha = Math.PI / 4; // 45 graus
@@ -194,37 +197,36 @@ const Matrix = {
     const LcosA = factor * Math.cos(alpha);
     const LsinA = factor * Math.sin(alpha);
 
-    // x_proj = x_orig + z_orig * L * cos(alpha)
-    // y_proj = y_orig + z_orig * L * sin(alpha)
-    // z_proj = z_orig (para Z-buffer)
-    // Elementos M[0,2] e M[1,2] (ou m[2] e m[6] em array 1D)
+    // x' = x + z * L * cos(alpha)
+    // y' = y + z * L * sin(alpha)
+    // z' = z (preservado para Z-buffer)
     return new Float32Array([
       1,
       0,
       LcosA,
-      0, // m[2] = LcosA
+      0, // linha 0: x' = x + z*LcosA
       0,
       1,
       LsinA,
-      0, // m[6] = LsinA
+      0, // linha 1: y' = y + z*LsinA
       0,
       0,
       1,
-      0, // Preserva Z
+      0, // linha 2: z' = z
       0,
       0,
       0,
-      1,
+      1, // linha 3: w' = w
     ]);
   },
 
   /**
-   * CORRIGIDO: Matriz de projeção oblíqua do tipo Cabinet
-   * Aplica cisalhamento em X e Y com base em Z, com fator de redução 0.5.
+   * Matriz de projeção oblíqua do tipo Cabinet
+   * Aplica cisalhamento reduzido em X e Y baseado em Z
    */
   obliqueCabinet: function () {
-    const alpha = Math.PI / 4;
-    const factor = 0.5;
+    const alpha = Math.PI / 4; // 45 graus
+    const factor = 0.5; // Fator de redução de 0.5
     const LcosA = factor * Math.cos(alpha);
     const LsinA = factor * Math.sin(alpha);
 
@@ -232,19 +234,19 @@ const Matrix = {
       1,
       0,
       LcosA,
-      0,
+      0, // linha 0: x' = x + z*LcosA*0.5
       0,
       1,
       LsinA,
-      0,
-      0,
-      0,
-      1,
-      0,
-      0,
+      0, // linha 1: y' = y + z*LsinA*0.5
       0,
       0,
       1,
+      0, // linha 2: z' = z
+      0,
+      0,
+      0,
+      1, // linha 3: w' = w
     ]);
   },
 

@@ -9,6 +9,7 @@ class Renderer {
     this.height = 0;
 
     this.showAxes = true;
+    this.showWireframe = true; // Nova propriedade para controlar wireframe
     this.modelData = null;
     this.transformMatrix = Matrix.identity();
     this.projectionMatrix = Matrix.identity();
@@ -146,7 +147,7 @@ class Renderer {
 
   _handleTranslation(deltaX, deltaY) {
     let tx = deltaX * this.translationSensitivity;
-    let ty = -deltaY * this.translationSensitivity; // O Y da tela é geralmente invertido em relação ao Y 3D
+    let ty = -deltaY * this.translationSensitivity;
     let tz = 0;
 
     if (this.currentKey === "z") {
@@ -154,13 +155,9 @@ class Renderer {
       ty = 0;
     }
 
-    const correctTranslationMatrix = Matrix.identity();
-    correctTranslationMatrix[3] = tx;
-    correctTranslationMatrix[7] = ty;
-    correctTranslationMatrix[11] = tz;
-
+    const translationMatrix = Matrix.translation(tx, ty, tz);
     this.transformMatrix = Matrix.multiply(
-      correctTranslationMatrix,
+      translationMatrix,
       this.transformMatrix
     );
     this.render();
@@ -273,7 +270,9 @@ class Renderer {
     }
 
     // Renderizar wireframe
-    this._renderWireframe(transformedVertices);
+    if (this.showWireframe) {
+      this._renderWireframe(transformedVertices);
+    }
 
     // Renderizar eixos
     if (this.showAxes) {
@@ -300,28 +299,41 @@ class Renderer {
     for (let i = 0; i < vertices.length; i += 3) {
       const v = [vertices[i], vertices[i + 1], vertices[i + 2], 1];
 
-      // Aplicar transformação
+      // Aplicar apenas a transformação de modelo para obter coordenadas do mundo
+      const worldTransformed = this._multiplyMatrixVector(
+        this.transformMatrix,
+        v
+      );
+
+      // Aplicar MVP completa para obter coordenadas de clipping
       const transformed4 = this._multiplyMatrixVector(mvpMatrix, v);
 
+      // Para Z-buffer: usar Z após transformação mas antes da divisão perspectiva
+      let zForBuffer = transformed4[2];
+
       // Perspectiva divide
+      let screenX = transformed4[0];
+      let screenY = transformed4[1];
+      let screenZ = transformed4[2];
+
       if (Math.abs(transformed4[3]) > 0.0001) {
-        transformed4[0] /= transformed4[3];
-        transformed4[1] /= transformed4[3];
-        transformed4[2] /= transformed4[3];
+        screenX /= transformed4[3];
+        screenY /= transformed4[3];
+        screenZ /= transformed4[3];
       }
 
       // Transformar para coordenadas de tela
-      const x = (transformed4[0] + 1) * 0.5 * this.width;
-      const y = (1 - transformed4[1]) * 0.5 * this.height;
-      const z = transformed4[2];
+      const x = (screenX + 1) * 0.5 * this.width;
+      const y = (1 - screenY) * 0.5 * this.height;
 
       transformed.push({
         x: x,
         y: y,
-        z: z,
-        worldX: vertices[i],
-        worldY: vertices[i + 1],
-        worldZ: vertices[i + 2],
+        z: zForBuffer, // Z para Z-buffer (antes da divisão perspectiva)
+        screenZ: screenZ, // Z normalizado
+        worldX: worldTransformed[0],
+        worldY: worldTransformed[1],
+        worldZ: worldTransformed[2],
       });
     }
 
@@ -341,8 +353,29 @@ class Renderer {
   }
 
   _renderFaces(transformedVertices) {
+    // Criar lista de faces com profundidade média para ordenação
+    const facesWithDepth = [];
+
     for (let i = 0; i < this.modelData.faces.length; i++) {
       const face = this.modelData.faces[i];
+
+      // Calcular profundidade média da face
+      let avgZ = 0;
+      for (let j = 0; j < face.length; j++) {
+        avgZ += transformedVertices[face[j]].z;
+      }
+      avgZ /= face.length;
+
+      facesWithDepth.push({ index: i, depth: avgZ, face: face });
+    }
+
+    // Ordenar faces por profundidade (mais distantes primeiro)
+    facesWithDepth.sort((a, b) => b.depth - a.depth);
+
+    // Renderizar faces ordenadas
+    for (let faceData of facesWithDepth) {
+      const face = faceData.face;
+      const faceIndex = faceData.index;
 
       // Backface culling
       if (this.backfaceCullingEnabled) {
@@ -350,17 +383,20 @@ class Renderer {
         const v1 = transformedVertices[face[1]];
         const v2 = transformedVertices[face[2]];
 
+        // Calcular normal da face no espaço da tela usando produto vetorial
         const edge1 = { x: v1.x - v0.x, y: v1.y - v0.y };
         const edge2 = { x: v2.x - v0.x, y: v2.y - v0.y };
         const screenNormal = edge1.x * edge2.y - edge1.y * edge2.x;
 
-        if (screenNormal >= 0) continue;
+        // Face está de costas se normal aponta para dentro da tela (valor negativo)
+        // No sistema de coordenadas da tela, Y cresce para baixo
+        if (screenNormal < 0) continue;
       }
 
       // Triangular a face
       for (let j = 1; j < face.length - 1; j++) {
         const triangle = [face[0], face[j], face[j + 1]];
-        this._renderTriangle(transformedVertices, triangle, i);
+        this._renderTriangle(transformedVertices, triangle, faceIndex);
       }
     }
   }
@@ -388,8 +424,8 @@ class Renderer {
     // Parte superior do triângulo
     for (let y = Math.ceil(v0.y); y <= Math.floor(v1.y); y++) {
       if (y >= 0 && y < this.height) {
-        const t = (y - v0.y) / (v2.y - v0.y);
-        const t1 = (y - v0.y) / (v1.y - v0.y);
+        const t = v2.y - v0.y > 0.0001 ? (y - v0.y) / (v2.y - v0.y) : 0;
+        const t1 = v1.y - v0.y > 0.0001 ? (y - v0.y) / (v1.y - v0.y) : 0;
 
         const x1 = v0.x + t * (v2.x - v0.x);
         const z1 = v0.z + t * (v2.z - v0.z);
@@ -404,8 +440,8 @@ class Renderer {
     // Parte inferior do triângulo
     for (let y = Math.ceil(v1.y); y <= Math.floor(v2.y); y++) {
       if (y >= 0 && y < this.height) {
-        const t = (y - v0.y) / (v2.y - v0.y);
-        const t1 = (y - v1.y) / (v2.y - v1.y);
+        const t = v2.y - v0.y > 0.0001 ? (y - v0.y) / (v2.y - v0.y) : 0;
+        const t1 = v2.y - v1.y > 0.0001 ? (y - v1.y) / (v2.y - v1.y) : 0;
 
         const x1 = v0.x + t * (v2.x - v0.x);
         const z1 = v0.z + t * (v2.z - v0.z);
@@ -461,6 +497,11 @@ class Renderer {
 
     // Calcular coordenadas baricêntricas
     const area = (v1.x - v0.x) * (v2.y - v0.y) - (v2.x - v0.x) * (v1.y - v0.y);
+
+    if (Math.abs(area) < 0.0001) {
+      return this.faceColor;
+    }
+
     const w0 = ((v1.x - x) * (v2.y - y) - (v2.x - x) * (v1.y - y)) / area;
     const w1 = ((v2.x - x) * (v0.y - y) - (v0.x - x) * (v2.y - y)) / area;
     const w2 = 1 - w0 - w1;
@@ -492,7 +533,6 @@ class Renderer {
         w0 * c0[2] + w1 * c1[2] + w2 * c2[2],
       ];
     } else {
-      // phong
       // Phong shading - interpolar normais
       const n0 = this._getVertexNormal(v0.index);
       const n1 = this._getVertexNormal(v1.index);
@@ -613,9 +653,18 @@ class Renderer {
     const specular = 0.3;
 
     return [
-      this.faceColor[0] * (ambient + diffuse * diff) + specular * spec,
-      this.faceColor[1] * (ambient + diffuse * diff) + specular * spec,
-      this.faceColor[2] * (ambient + diffuse * diff) + specular * spec,
+      Math.min(
+        1,
+        this.faceColor[0] * (ambient + diffuse * diff) + specular * spec
+      ),
+      Math.min(
+        1,
+        this.faceColor[1] * (ambient + diffuse * diff) + specular * spec
+      ),
+      Math.min(
+        1,
+        this.faceColor[2] * (ambient + diffuse * diff) + specular * spec
+      ),
     ];
   }
 
@@ -636,7 +685,8 @@ class Renderer {
         const edge2 = { x: v2.x - v0.x, y: v2.y - v0.y };
         const screenNormal = edge1.x * edge2.y - edge1.y * edge2.x;
 
-        faceVisible = screenNormal > 0;
+        // Consistente com a renderização de faces
+        faceVisible = screenNormal >= 0;
       }
 
       if (!faceVisible) continue;
@@ -728,6 +778,9 @@ class Renderer {
     const mvpMatrix = Matrix.multiply(this.projectionMatrix, Matrix.identity());
     const transformed = this._multiplyMatrixVector(mvpMatrix, v);
 
+    // Guardar Z no espaço da câmera
+    const cameraZ = v[2];
+
     if (Math.abs(transformed[3]) > 0.0001) {
       transformed[0] /= transformed[3];
       transformed[1] /= transformed[3];
@@ -737,7 +790,7 @@ class Renderer {
     return {
       x: (transformed[0] + 1) * 0.5 * this.width,
       y: (1 - transformed[1]) * 0.5 * this.height,
-      z: transformed[2],
+      z: cameraZ,
     };
   }
 
