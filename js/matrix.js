@@ -1,17 +1,12 @@
+// matrix.js
+
 const Matrix = {
-  /**
-   * Cria uma matriz de identidade 4x4
-   */
   identity: function () {
     return new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   },
 
-  /**
-   * Multiplicação de matrizes 4x4
-   */
   multiply: function (a, b) {
     const result = new Float32Array(16);
-
     for (let i = 0; i < 4; i++) {
       for (let j = 0; j < 4; j++) {
         result[i * 4 + j] =
@@ -21,17 +16,9 @@ const Matrix = {
           a[i * 4 + 3] * b[3 * 4 + j];
       }
     }
-
     return result;
   },
 
-  /**
-   * Cria uma matriz de translação
-   * @param {number} tx - Translação no eixo X
-   * @param {number} ty - Translação no eixo Y
-   * @param {number} tz - Translação no eixo Z
-   * @returns {Float32Array} Matriz de translação
-   */
   translation: function (tx, ty, tz) {
     return new Float32Array([
       1,
@@ -53,13 +40,6 @@ const Matrix = {
     ]);
   },
 
-  /**
-   * Cria uma matriz de escala
-   * @param {number} sx - Fator de escala no eixo X
-   * @param {number} sy - Fator de escala no eixo Y
-   * @param {number} sz - Fator de escala no eixo Z
-   * @returns {Float32Array} Matriz de escala
-   */
   scaling: function (sx, sy, sz) {
     return new Float32Array([
       sx,
@@ -81,89 +61,109 @@ const Matrix = {
     ]);
   },
 
-  /**
-   * Cria uma matriz de rotação em torno do eixo X
-   * @param {number} angleInRadians - Ângulo de rotação em radianos
-   * @returns {Float32Array} Matriz de rotação
-   */
   rotationX: function (angleInRadians) {
     const c = Math.cos(angleInRadians);
     const s = Math.sin(angleInRadians);
-
     return new Float32Array([1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1]);
   },
 
-  /**
-   * Cria uma matriz de rotação em torno do eixo Y
-   * @param {number} angleInRadians - Ângulo de rotação em radianos
-   * @returns {Float32Array} Matriz de rotação
-   */
   rotationY: function (angleInRadians) {
     const c = Math.cos(angleInRadians);
     const s = Math.sin(angleInRadians);
-
     return new Float32Array([c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1]);
   },
 
-  /**
-   * Cria uma matriz de rotação em torno do eixo Z
-   * @param {number} angleInRadians - Ângulo de rotação em radianos
-   * @returns {Float32Array} Matriz de rotação
-   */
   rotationZ: function (angleInRadians) {
     const c = Math.cos(angleInRadians);
     const s = Math.sin(angleInRadians);
-
     return new Float32Array([c, s, 0, 0, -s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   },
 
   /**
-   * Cria uma matriz de projeção ortográfica para vista frontal (XY)
-   * @returns {Float32Array} Matriz de projeção ortográfica
+   * CORRIGIDO: Matriz de projeção ortográfica para vista frontal (XY)
+   * Preserva Z para o Z-buffering.
    */
   orthographicFront: function () {
-    // Vista frontal (XY): Preserva X e Y, comprime Z
-    return new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
+    // Vista frontal (XY): Preserva X, Y e Z (para profundidade)
+    return new Float32Array([
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0, // Modificado: Z não é mais zerado, permitindo Z-buffer
+      0,
+      0,
+      0,
+      1,
+    ]);
   },
 
-  /**
-   * Cria uma matriz de projeção ortográfica para vista superior (XZ)
-   * @returns {Float32Array} Matriz de projeção ortográfica
-   */
   orthographicTop: function () {
     // Vista superior (XZ): Rotação em torno do eixo X por -90 graus
-    const angle = -Math.PI / 2;
-    const c = Math.cos(angle);
-    const s = Math.sin(angle);
-
-    return new Float32Array([1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1]);
+    // Original Y -> -Z', Original Z -> Y'
+    return new Float32Array([
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0, // Y do mundo mapeado para Z da tela (com inversão implícita na transformação para tela)
+      0,
+      -1,
+      0,
+      0, // Z do mundo mapeado para -Y da tela
+      0,
+      0,
+      0,
+      1,
+    ]);
   },
 
-  /**
-   * Cria uma matriz de projeção ortográfica para vista lateral (YZ)
-   * @returns {Float32Array} Matriz de projeção ortográfica
-   */
   orthographicSide: function () {
     // Vista lateral (YZ): Rotação em torno do eixo Y por 90 graus
-    const angle = Math.PI / 2;
-    const c = Math.cos(angle);
-    const s = Math.sin(angle);
-
-    return new Float32Array([0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1]);
+    // Original X -> Z', Original Z -> -X'
+    return new Float32Array([
+      0,
+      0,
+      -1,
+      0, // X do mundo mapeado para -Z da tela
+      0,
+      1,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0, // Z do mundo mapeado para X da tela
+      0,
+      0,
+      0,
+      1,
+    ]);
   },
 
   /**
-   * Cria uma matriz de projeção em perspectiva (1 ponto de fuga)
-   * @param {number} fovRadians - Campo de visão em radianos
-   * @param {number} aspect - Razão largura/altura do canvas
-   * @param {number} near - Plano de corte próximo
-   * @param {number} far - Plano de corte distante
-   * @returns {Float32Array} Matriz de projeção em perspectiva
+   * CORRIGIDO: Matriz de projeção em perspectiva (1 ponto de fuga)
+   * Garante que w_clip = -z_eye e mapeamento de profundidade correto.
    */
   perspective: function (fovRadians, aspect, near, far) {
-    const f = Math.tan(Math.PI * 0.5 - 0.5 * fovRadians);
-    const rangeInv = 1.0 / (near - far);
+    const f = Math.tan(Math.PI * 0.5 - 0.5 * fovRadians); // cot(fov/2)
+    const rangeInv = 1.0 / (near - far); //  1 / (N-F)
 
+    // Matriz de perspectiva padrão (OpenGL like)
+    // P22 = (N+F)/(N-F), P23 = (2NF)/(N-F), P32 = -1
+    // Os índices para Float32Array são linha por linha:
+    // m[10] é P_22, m[11] é P_23
+    // m[14] é P_32
     return new Float32Array([
       f / aspect,
       0,
@@ -176,36 +176,41 @@ const Matrix = {
       0,
       0,
       (near + far) * rangeInv,
+      near * far * rangeInv * 2, // P22, P23
+      0,
+      0,
       -1,
-      0,
-      0,
-      near * far * rangeInv * 2,
-      0,
+      0, // P32, P33
     ]);
   },
 
   /**
-   * Cria uma matriz de projeção oblíqua do tipo Cavaleira
-   * Ângulo de 45° com fator de redução 1
-   * @returns {Float32Array} Matriz de projeção cavaleira
+   * CORRIGIDO: Matriz de projeção oblíqua do tipo Cavaleira
+   * Aplica cisalhamento em X e Y com base em Z.
    */
   obliqueCavalier: function () {
     const alpha = Math.PI / 4; // 45 graus
     const factor = 1.0; // Fator de redução de 1 (sem redução)
+    const LcosA = factor * Math.cos(alpha);
+    const LsinA = factor * Math.sin(alpha);
 
+    // x_proj = x_orig + z_orig * L * cos(alpha)
+    // y_proj = y_orig + z_orig * L * sin(alpha)
+    // z_proj = z_orig (para Z-buffer)
+    // Elementos M[0,2] e M[1,2] (ou m[2] e m[6] em array 1D)
     return new Float32Array([
       1,
       0,
+      LcosA,
+      0, // m[2] = LcosA
       0,
+      1,
+      LsinA,
+      0, // m[6] = LsinA
       0,
       0,
       1,
-      0,
-      0,
-      factor * Math.cos(alpha),
-      factor * Math.sin(alpha),
-      1,
-      0,
+      0, // Preserva Z
       0,
       0,
       0,
@@ -214,25 +219,26 @@ const Matrix = {
   },
 
   /**
-   * Cria uma matriz de projeção oblíqua do tipo Cabinet
-   * Ângulo de 45° com fator de redução 0.5
-   * @returns {Float32Array} Matriz de projeção cabinet
+   * CORRIGIDO: Matriz de projeção oblíqua do tipo Cabinet
+   * Aplica cisalhamento em X e Y com base em Z, com fator de redução 0.5.
    */
   obliqueCabinet: function () {
-    const alpha = Math.PI / 4; // 45 graus
-    const factor = 0.5; // Fator de redução de 0.5 (metade da profundidade)
+    const alpha = Math.PI / 4;
+    const factor = 0.5;
+    const LcosA = factor * Math.cos(alpha);
+    const LsinA = factor * Math.sin(alpha);
 
     return new Float32Array([
       1,
       0,
-      0,
+      LcosA,
       0,
       0,
       1,
+      LsinA,
       0,
       0,
-      factor * Math.cos(alpha),
-      factor * Math.sin(alpha),
+      0,
       1,
       0,
       0,
@@ -242,28 +248,20 @@ const Matrix = {
     ]);
   },
 
-  /**
-   * Aplicar transformação a vértices
-   * @param {Float32Array} vertices - Array de vértices
-   * @param {Float32Array} matrix - Matriz de transformação
-   * @returns {Float32Array} Vértices transformados
-   */
   transformVertices: function (vertices, matrix) {
     const result = new Float32Array(vertices.length);
-
     for (let i = 0; i < vertices.length; i += 3) {
       const x = vertices[i];
       const y = vertices[i + 1];
       const z = vertices[i + 2];
+      const w = 1;
 
-      // Aplicar transformação
-      result[i] = matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12];
+      result[i] = matrix[0] * x + matrix[1] * y + matrix[2] * z + matrix[3] * w;
       result[i + 1] =
-        matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13];
+        matrix[4] * x + matrix[5] * y + matrix[6] * z + matrix[7] * w;
       result[i + 2] =
-        matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14];
+        matrix[8] * x + matrix[9] * y + matrix[10] * z + matrix[11] * w;
     }
-
     return result;
   },
 };

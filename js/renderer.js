@@ -1,16 +1,18 @@
 class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
-    this.gl = null;
-    this.programs = {};
-    this.activeProgram = null;
-    this.buffers = {};
+    this.ctx = canvas.getContext("2d");
+    this.imageData = null;
+    this.pixelBuffer = null;
+    this.zBuffer = null;
+    this.width = 0;
+    this.height = 0;
+
     this.showAxes = true;
-    this.axisBuffers = {};
     this.modelData = null;
-    this.triangleCount = 0;
     this.transformMatrix = Matrix.identity();
     this.projectionMatrix = Matrix.identity();
+
     this.isDragging = false;
     this.lastMouseX = 0;
     this.lastMouseY = 0;
@@ -18,6 +20,7 @@ class Renderer {
     this.rotationSensitivity = 0.01;
     this.translationSensitivity = 0.01;
     this.scaleSensitivity = 0.005;
+
     this.fillFaces = false;
     this.lightingEnabled = false;
     this.backfaceCullingEnabled = true;
@@ -28,53 +31,38 @@ class Renderer {
     this.movingLight = false;
     this.solzinhoCanvas = document.getElementById("solzinho");
     this.viewPosition = [0, 0, -1]; // Observador fixo em Z
+
     this.init();
   }
 
   init() {
-    this.gl = this.canvas.getContext("webgl", {
-      antialias: true,
-      depth: true,
-      preserveDrawingBuffer: true,
-    });
-
-    if (!this.gl) {
-      alert("WebGL não suportado.");
-      return;
-    }
-
     this.resizeCanvas();
-    this._initShaders();
-
-    // Configurações iniciais do WebGL
-    this.gl.clearColor(0.95, 0.95, 0.95, 1.0);
-    this.gl.enable(this.gl.DEPTH_TEST);
-    this.gl.depthFunc(this.gl.LEQUAL);
-
-    // Habilitar backface culling por padrão
-    this.gl.enable(this.gl.CULL_FACE);
-    this.gl.cullFace(this.gl.BACK);
-    this.gl.frontFace(this.gl.CCW);
-
     this._initEventListeners();
-    this._createAxisBuffers();
   }
 
-  _createAxisBuffers() {
-    const gl = this.gl;
-    const axisVertices = new Float32Array([
-      // X axis - red
-      -1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0,
-      // Y axis - green
-      0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0,
-      // Z axis - blue
-      0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 1,
-    ]);
+  resizeCanvas() {
+    const displayWidth = this.canvas.clientWidth;
+    const displayHeight = this.canvas.clientHeight;
 
-    this.axisBuffers.vbo = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.axisBuffers.vbo);
-    gl.bufferData(gl.ARRAY_BUFFER, axisVertices, gl.STATIC_DRAW);
-    this.axisBuffers.vertexCount = 6;
+    if (
+      this.canvas.width !== displayWidth ||
+      this.canvas.height !== displayHeight
+    ) {
+      this.canvas.width = displayWidth;
+      this.canvas.height = displayHeight;
+      this.width = displayWidth;
+      this.height = displayHeight;
+
+      // Criar buffers
+      this.imageData = this.ctx.createImageData(this.width, this.height);
+      this.pixelBuffer = new Uint8ClampedArray(this.width * this.height * 4);
+      this.zBuffer = new Float32Array(this.width * this.height);
+    }
+
+    if (this.solzinhoCanvas) {
+      this.solzinhoCanvas.width = displayWidth;
+      this.solzinhoCanvas.height = displayHeight;
+    }
   }
 
   _initEventListeners() {
@@ -158,7 +146,7 @@ class Renderer {
 
   _handleTranslation(deltaX, deltaY) {
     let tx = deltaX * this.translationSensitivity;
-    let ty = -deltaY * this.translationSensitivity;
+    let ty = -deltaY * this.translationSensitivity; // O Y da tela é geralmente invertido em relação ao Y 3D
     let tz = 0;
 
     if (this.currentKey === "z") {
@@ -166,9 +154,13 @@ class Renderer {
       ty = 0;
     }
 
-    const translationMatrix = Matrix.translation(tx, ty, tz);
+    const correctTranslationMatrix = Matrix.identity();
+    correctTranslationMatrix[3] = tx;
+    correctTranslationMatrix[7] = ty;
+    correctTranslationMatrix[11] = tz;
+
     this.transformMatrix = Matrix.multiply(
-      translationMatrix,
+      correctTranslationMatrix,
       this.transformMatrix
     );
     this.render();
@@ -196,575 +188,557 @@ class Renderer {
     this.render();
   }
 
-  _initShaders() {
-    // Vertex shader para Flat shading
-    const vsFlat = `
-      attribute vec3 aPosition;
-      attribute vec3 aNormal;
-      uniform mat4 uTransformMatrix;
-      uniform mat4 uProjectionMatrix;
-      uniform mat4 uNormalMatrix;
-      varying vec3 vNormal;
-      varying vec3 vPosition;
-      void main() {
-        vec4 worldPosition = uTransformMatrix * vec4(aPosition, 1.0);
-        vPosition = worldPosition.xyz;
-        vNormal = normalize(mat3(uNormalMatrix) * aNormal);
-        gl_Position = uProjectionMatrix * worldPosition;
-      }
-    `;
-
-    // Fragment shader para Flat shading
-    const fsFlat = `
-      precision mediump float;
-      varying vec3 vNormal;
-      varying vec3 vPosition;
-      uniform vec3 uLightPosition;
-      uniform int uLightingEnabled;
-      uniform vec3 uFaceColor;
-      uniform vec3 uViewPosition;
-      void main() {
-        if (uLightingEnabled == 0) {
-          gl_FragColor = vec4(uFaceColor, 1.0);
-        } else {
-          vec3 N = normalize(vNormal);
-          vec3 L = normalize(uLightPosition - vPosition);
-          float diff = max(dot(N, L), 0.0);
-          
-          vec3 ambient = uFaceColor * 0.3;
-          vec3 diffuse = uFaceColor * diff * 0.6;
-          
-          vec3 V = normalize(uViewPosition - vPosition);
-          vec3 R = reflect(-L, N);
-          float spec = pow(max(dot(V, R), 0.0), 32.0);
-          vec3 specular = vec3(1.0, 1.0, 1.0) * spec * 0.3;
-          
-          vec3 color = ambient + diffuse + specular;
-          gl_FragColor = vec4(color, 1.0);
-        }
-      }
-    `;
-
-    // Vertex shader para Gouraud shading
-    const vsGouraud = `
-      attribute vec3 aPosition;
-      attribute vec3 aNormal;
-      uniform mat4 uTransformMatrix;
-      uniform mat4 uProjectionMatrix;
-      uniform mat4 uNormalMatrix;
-      uniform vec3 uLightPosition;
-      uniform vec3 uFaceColor;
-      uniform vec3 uViewPosition;
-      uniform int uLightingEnabled;
-      varying vec3 vColor;
-      void main() {
-        vec4 worldPosition = uTransformMatrix * vec4(aPosition, 1.0);
-        vec3 pos = worldPosition.xyz;
-        vec3 norm = normalize(mat3(uNormalMatrix) * aNormal);
-        
-        if(uLightingEnabled == 0) {
-          vColor = uFaceColor;
-        } else {
-          vec3 N = norm;
-          vec3 L = normalize(uLightPosition - pos);
-          float diff = max(dot(N, L), 0.0);
-          
-          vec3 ambient = uFaceColor * 0.3;
-          vec3 diffuse = uFaceColor * diff * 0.6;
-          
-          vec3 V = normalize(uViewPosition - pos);
-          vec3 R = reflect(-L, N);
-          float spec = pow(max(dot(V, R), 0.0), 32.0);
-          vec3 specular = vec3(1.0, 1.0, 1.0) * spec * 0.3;
-          
-          vColor = ambient + diffuse + specular;
-        }
-        gl_Position = uProjectionMatrix * worldPosition;
-      }
-    `;
-
-    // Fragment shader para Gouraud shading
-    const fsGouraud = `
-      precision mediump float;
-      varying vec3 vColor;
-      void main() {
-        gl_FragColor = vec4(vColor, 1.0);
-      }
-    `;
-
-    // Vertex shader para Phong shading
-    const vsPhong = `
-      attribute vec3 aPosition;
-      attribute vec3 aNormal;
-      uniform mat4 uTransformMatrix;
-      uniform mat4 uProjectionMatrix;
-      uniform mat4 uNormalMatrix;
-      varying vec3 vPosition;
-      varying vec3 vNormal;
-      void main() {
-        vec4 worldPosition = uTransformMatrix * vec4(aPosition, 1.0);
-        vPosition = worldPosition.xyz;
-        vNormal = normalize(mat3(uNormalMatrix) * aNormal);
-        gl_Position = uProjectionMatrix * worldPosition;
-      }
-    `;
-
-    // Fragment shader para Phong shading
-    const fsPhong = `
-      precision mediump float;
-      varying vec3 vPosition;
-      varying vec3 vNormal;
-      uniform vec3 uLightPosition;
-      uniform int uLightingEnabled;
-      uniform vec3 uFaceColor;
-      uniform vec3 uViewPosition;
-      void main() {
-        if (uLightingEnabled == 0) {
-          gl_FragColor = vec4(uFaceColor, 1.0);
-        } else {
-          vec3 N = normalize(vNormal);
-          vec3 L = normalize(uLightPosition - vPosition);
-          float diff = max(dot(N, L), 0.0);
-          
-          vec3 ambient = uFaceColor * 0.3;
-          vec3 diffuse = uFaceColor * diff * 0.6;
-          
-          vec3 V = normalize(uViewPosition - vPosition);
-          vec3 R = reflect(-L, N);
-          float spec = pow(max(dot(V, R), 0.0), 32.0);
-          vec3 specular = vec3(1.0, 1.0, 1.0) * spec * 0.3;
-          
-          vec3 color = ambient + diffuse + specular;
-          gl_FragColor = vec4(color, 1.0);
-        }
-      }
-    `;
-
-    this.programs.flat = this._createProgram(vsFlat, fsFlat);
-    this.programs.gouraud = this._createProgram(vsGouraud, fsGouraud);
-    this.programs.phong = this._createProgram(vsPhong, fsPhong);
-    this.activeProgram = this.programs.flat;
-  }
-
-  _createProgram(vsSource, fsSource) {
-    const gl = this.gl;
-    const vertexShader = this._createShader(gl.VERTEX_SHADER, vsSource);
-    const fragmentShader = this._createShader(gl.FRAGMENT_SHADER, fsSource);
-    const program = gl.createProgram();
-
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.linkProgram(program);
-
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error("Erro ao linkar shaders:", gl.getProgramInfoLog(program));
-      return null;
-    }
-
-    // Atributos
-    program.aPosition = gl.getAttribLocation(program, "aPosition");
-    program.aNormal = gl.getAttribLocation(program, "aNormal");
-
-    // Uniformes
-    program.uTransformMatrix = gl.getUniformLocation(
-      program,
-      "uTransformMatrix"
-    );
-    program.uProjectionMatrix = gl.getUniformLocation(
-      program,
-      "uProjectionMatrix"
-    );
-    program.uNormalMatrix = gl.getUniformLocation(program, "uNormalMatrix");
-    program.uLightPosition = gl.getUniformLocation(program, "uLightPosition");
-    program.uLightingEnabled = gl.getUniformLocation(
-      program,
-      "uLightingEnabled"
-    );
-    program.uFaceColor = gl.getUniformLocation(program, "uFaceColor");
-    program.uViewPosition = gl.getUniformLocation(program, "uViewPosition");
-
-    return program;
-  }
-
-  _createShader(type, source) {
-    const shader = this.gl.createShader(type);
-    this.gl.shaderSource(shader, source);
-    this.gl.compileShader(shader);
-
-    if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
-      console.error(
-        "Erro ao compilar shader:",
-        this.gl.getShaderInfoLog(shader)
-      );
-      this.gl.deleteShader(shader);
-      return null;
-    }
-
-    return shader;
-  }
-
   setLightingType(type) {
     this.lightingType = type;
-    this.activeProgram = this.programs[type] || this.programs.flat;
     this.render();
-  }
-
-  resizeCanvas() {
-    const displayWidth = this.canvas.clientWidth;
-    const displayHeight = this.canvas.clientHeight;
-
-    if (
-      this.canvas.width !== displayWidth ||
-      this.canvas.height !== displayHeight
-    ) {
-      this.canvas.width = displayWidth;
-      this.canvas.height = displayHeight;
-      this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    }
-
-    if (this.solzinhoCanvas) {
-      this.solzinhoCanvas.width = displayWidth;
-      this.solzinhoCanvas.height = displayHeight;
-    }
   }
 
   loadModel(modelData) {
-    const gl = this.gl;
     this.modelData = modelData;
+
+    // Calcular normais de vértices se não existirem
+    if (!modelData.vertexNormals || modelData.vertexNormals.length === 0) {
+      this._calculateVertexNormals();
+    }
+
     this.transformMatrix = Matrix.identity();
     this.projectionMatrix = Matrix.identity();
-
-    // Criar buffer de vértices
-    this.buffers.vertex = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.vertex);
-    gl.bufferData(gl.ARRAY_BUFFER, modelData.verticesActual, gl.STATIC_DRAW);
-
-    // Criar buffer de normais
-    if (!modelData.vertexNormals || modelData.vertexNormals.length === 0) {
-      // Se não houver normais, criar normais padrão
-      const count = modelData.verticesActual.length;
-      this.modelData.vertexNormals = new Float32Array(count);
-      for (let i = 0; i < count; i += 3) {
-        this.modelData.vertexNormals[i] = 0;
-        this.modelData.vertexNormals[i + 1] = 1;
-        this.modelData.vertexNormals[i + 2] = 0;
-      }
-    }
-
-    this.buffers.normal = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.normal);
-    gl.bufferData(
-      gl.ARRAY_BUFFER,
-      this.modelData.vertexNormals,
-      gl.STATIC_DRAW
-    );
-
-    // Criar índices para triângulos
-    const triangleIndices = [];
-    const triangleEdges = []; // Arestas dos triângulos para wireframe correto
-
-    for (let face of modelData.faces) {
-      const faceTriangles = [];
-
-      if (face.length === 3) {
-        faceTriangles.push([face[0], face[1], face[2]]);
-      } else if (face.length === 4) {
-        // Triangular quads
-        faceTriangles.push([face[0], face[1], face[2]]);
-        faceTriangles.push([face[0], face[2], face[3]]);
-      } else if (face.length > 4) {
-        // Triangular polígonos
-        for (let i = 1; i < face.length - 1; i++) {
-          faceTriangles.push([face[0], face[i], face[i + 1]]);
-        }
-      }
-
-      // Adicionar triângulos e suas arestas
-      for (let tri of faceTriangles) {
-        triangleIndices.push(tri[0], tri[1], tri[2]);
-
-        // Adicionar arestas do triângulo
-        triangleEdges.push(tri[0], tri[1], tri[1], tri[2], tri[2], tri[0]);
-      }
-    }
-
-    this.buffers.triangle = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.buffers.triangle);
-    gl.bufferData(
-      gl.ELEMENT_ARRAY_BUFFER,
-      new Uint16Array(triangleIndices),
-      gl.STATIC_DRAW
-    );
-    this.triangleCount = triangleIndices.length;
-
-    // Criar índices para arestas (usando as arestas dos triângulos)
-    // Isso garante que as arestas correspondam exatamente aos triângulos renderizados
-    this.buffers.edge = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.buffers.edge);
-    gl.bufferData(
-      gl.ELEMENT_ARRAY_BUFFER,
-      new Uint16Array(triangleEdges),
-      gl.STATIC_DRAW
-    );
-    this.edgeCount = triangleEdges.length;
-
-    // Criar buffer separado para todas as arestas (modo wireframe completo)
-    const allEdgeIndices = [];
-    const edgeSet = new Set();
-
-    for (let face of modelData.faces) {
-      for (let i = 0; i < face.length; i++) {
-        const current = face[i];
-        const next = face[(i + 1) % face.length];
-
-        // Evitar duplicatas
-        const edgeKey =
-          current < next ? `${current}-${next}` : `${next}-${current}`;
-        if (!edgeSet.has(edgeKey)) {
-          edgeSet.add(edgeKey);
-          allEdgeIndices.push(current, next);
-        }
-      }
-    }
-
-    this.buffers.allEdges = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.buffers.allEdges);
-    gl.bufferData(
-      gl.ELEMENT_ARRAY_BUFFER,
-      new Uint16Array(allEdgeIndices),
-      gl.STATIC_DRAW
-    );
-    this.allEdgeCount = allEdgeIndices.length;
-
     this.render();
   }
 
-  render() {
-    if (!this.gl || !this.modelData) return;
+  _calculateVertexNormals() {
+    const vertexCount = this.modelData.verticesActual.length / 3;
+    const normals = new Float32Array(vertexCount * 3);
+    const counts = new Float32Array(vertexCount);
 
-    const gl = this.gl;
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    // Acumular normais das faces em cada vértice
+    for (let i = 0; i < this.modelData.faces.length; i++) {
+      const face = this.modelData.faces[i];
+      const faceNormalIndex = i * 3;
 
-    // Configurar Z-Buffer
-    if (this.zBufferEnabled) {
-      gl.enable(gl.DEPTH_TEST);
-      gl.depthFunc(gl.LEQUAL);
-    } else {
-      gl.disable(gl.DEPTH_TEST);
-    }
-
-    // Configurar Backface Culling
-    if (this.backfaceCullingEnabled) {
-      gl.enable(gl.CULL_FACE);
-      gl.cullFace(gl.BACK);
-      gl.frontFace(gl.CCW);
-    } else {
-      gl.disable(gl.CULL_FACE);
-    }
-
-    gl.useProgram(this.activeProgram);
-
-    // Configurar matrizes
-    gl.uniformMatrix4fv(
-      this.activeProgram.uTransformMatrix,
-      false,
-      this.transformMatrix
-    );
-    gl.uniformMatrix4fv(
-      this.activeProgram.uProjectionMatrix,
-      false,
-      this.projectionMatrix
-    );
-
-    // Calcular e definir a matriz normal
-    const normalMatrix = this._calculateNormalMatrix(this.transformMatrix);
-    gl.uniformMatrix4fv(this.activeProgram.uNormalMatrix, false, normalMatrix);
-
-    // Configurar iluminação
-    gl.uniform3fv(this.activeProgram.uLightPosition, this.lightPosition);
-    gl.uniform3fv(this.activeProgram.uViewPosition, this.viewPosition);
-    gl.uniform3fv(this.activeProgram.uFaceColor, this.faceColor);
-    gl.uniform1i(
-      this.activeProgram.uLightingEnabled,
-      this.lightingEnabled ? 1 : 0
-    );
-
-    // Configurar buffers de vértices
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.vertex);
-    gl.vertexAttribPointer(
-      this.activeProgram.aPosition,
-      3,
-      gl.FLOAT,
-      false,
-      0,
-      0
-    );
-    gl.enableVertexAttribArray(this.activeProgram.aPosition);
-
-    // Configurar buffers de normais
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.normal);
-    gl.vertexAttribPointer(
-      this.activeProgram.aNormal,
-      3,
-      gl.FLOAT,
-      false,
-      0,
-      0
-    );
-    gl.enableVertexAttribArray(this.activeProgram.aNormal);
-
-    // Renderizar faces preenchidas
-    if (this.fillFaces) {
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.buffers.triangle);
-      gl.drawElements(gl.TRIANGLES, this.triangleCount, gl.UNSIGNED_SHORT, 0);
-    }
-
-    // Renderizar wireframe com visibilidade correta
-    gl.uniform3fv(this.activeProgram.uFaceColor, [0, 0, 0]);
-    gl.uniform1i(this.activeProgram.uLightingEnabled, 0);
-
-    if (this.fillFaces) {
-      // Quando as faces estão preenchidas, usar o Z-buffer para ocultar linhas
-
-      // Aplicar um pequeno offset para evitar z-fighting
-      gl.enable(gl.POLYGON_OFFSET_FILL);
-      gl.polygonOffset(1.0, 1.0);
-
-      // Re-renderizar as faces invisíveis para preencher o Z-buffer
-      gl.colorMask(false, false, false, false);
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.buffers.triangle);
-      gl.drawElements(gl.TRIANGLES, this.triangleCount, gl.UNSIGNED_SHORT, 0);
-      gl.colorMask(true, true, true, true);
-
-      gl.disable(gl.POLYGON_OFFSET_FILL);
-
-      // Renderizar apenas as arestas dos triângulos visíveis
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.buffers.edge);
-      gl.drawElements(gl.LINES, this.edgeCount, gl.UNSIGNED_SHORT, 0);
-    } else {
-      // Quando não há preenchimento, mostrar todas as arestas
-      gl.disable(gl.CULL_FACE);
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.buffers.allEdges);
-      gl.drawElements(gl.LINES, this.allEdgeCount, gl.UNSIGNED_SHORT, 0);
-
-      if (this.backfaceCullingEnabled) {
-        gl.enable(gl.CULL_FACE);
+      for (let vertex of face) {
+        normals[vertex * 3] += this.modelData.faceNormals[faceNormalIndex];
+        normals[vertex * 3 + 1] +=
+          this.modelData.faceNormals[faceNormalIndex + 1];
+        normals[vertex * 3 + 2] +=
+          this.modelData.faceNormals[faceNormalIndex + 2];
+        counts[vertex]++;
       }
     }
 
-    // Restaurar configurações
-    if (this.backfaceCullingEnabled) {
-      gl.enable(gl.CULL_FACE);
+    // Normalizar
+    for (let i = 0; i < vertexCount; i++) {
+      if (counts[i] > 0) {
+        const idx = i * 3;
+        const len = Math.sqrt(
+          normals[idx] * normals[idx] +
+            normals[idx + 1] * normals[idx + 1] +
+            normals[idx + 2] * normals[idx + 2]
+        );
+        if (len > 0) {
+          normals[idx] /= len;
+          normals[idx + 1] /= len;
+          normals[idx + 2] /= len;
+        }
+      }
     }
+
+    this.modelData.vertexNormals = normals;
+  }
+
+  render() {
+    if (!this.modelData) return;
+
+    // Limpar buffers
+    this.pixelBuffer.fill(0);
+    for (let i = 3; i < this.pixelBuffer.length; i += 4) {
+      this.pixelBuffer[i] = 255; // Alpha
+    }
+    this.zBuffer.fill(Number.POSITIVE_INFINITY);
+
+    // Cor de fundo
+    for (let i = 0; i < this.pixelBuffer.length; i += 4) {
+      this.pixelBuffer[i] = 242; // R
+      this.pixelBuffer[i + 1] = 242; // G
+      this.pixelBuffer[i + 2] = 242; // B
+      this.pixelBuffer[i + 3] = 255; // A
+    }
+
+    // Transformar vértices
+    const transformedVertices = this._transformVertices();
+
+    // Renderizar faces
+    if (this.fillFaces) {
+      this._renderFaces(transformedVertices);
+    }
+
+    // Renderizar wireframe
+    this._renderWireframe(transformedVertices);
 
     // Renderizar eixos
     if (this.showAxes) {
       this._renderAxes();
     }
 
+    // Copiar para canvas
+    this.imageData.data.set(this.pixelBuffer);
+    this.ctx.putImageData(this.imageData, 0, 0);
+
     // Renderizar indicador de luz
     this._drawLightIndicator2D();
   }
 
-  _calculateNormalMatrix(modelMatrix) {
-    // Extrair a parte 3x3 da matriz de modelo
-    const m = modelMatrix;
-    const a00 = m[0],
-      a01 = m[1],
-      a02 = m[2];
-    const a10 = m[4],
-      a11 = m[5],
-      a12 = m[6];
-    const a20 = m[8],
-      a21 = m[9],
-      a22 = m[10];
+  _transformVertices() {
+    const vertices = this.modelData.verticesActual;
+    const transformed = [];
 
-    // Calcular o determinante
-    const det =
-      a00 * (a11 * a22 - a12 * a21) -
-      a01 * (a10 * a22 - a12 * a20) +
-      a02 * (a10 * a21 - a11 * a20);
+    const mvpMatrix = Matrix.multiply(
+      this.projectionMatrix,
+      this.transformMatrix
+    );
 
-    if (Math.abs(det) < 0.0001) {
-      // Matriz singular, retornar identidade
-      return new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+    for (let i = 0; i < vertices.length; i += 3) {
+      const v = [vertices[i], vertices[i + 1], vertices[i + 2], 1];
+
+      // Aplicar transformação
+      const transformed4 = this._multiplyMatrixVector(mvpMatrix, v);
+
+      // Perspectiva divide
+      if (Math.abs(transformed4[3]) > 0.0001) {
+        transformed4[0] /= transformed4[3];
+        transformed4[1] /= transformed4[3];
+        transformed4[2] /= transformed4[3];
+      }
+
+      // Transformar para coordenadas de tela
+      const x = (transformed4[0] + 1) * 0.5 * this.width;
+      const y = (1 - transformed4[1]) * 0.5 * this.height;
+      const z = transformed4[2];
+
+      transformed.push({
+        x: x,
+        y: y,
+        z: z,
+        worldX: vertices[i],
+        worldY: vertices[i + 1],
+        worldZ: vertices[i + 2],
+      });
     }
 
-    const invDet = 1 / det;
+    return transformed;
+  }
 
-    // Calcular a inversa transposta (matriz normal)
-    const normalMatrix = new Float32Array(16);
+  _multiplyMatrixVector(matrix, vector) {
+    const result = [0, 0, 0, 0];
+    for (let i = 0; i < 4; i++) {
+      result[i] =
+        matrix[i * 4] * vector[0] +
+        matrix[i * 4 + 1] * vector[1] +
+        matrix[i * 4 + 2] * vector[2] +
+        matrix[i * 4 + 3] * vector[3];
+    }
+    return result;
+  }
 
-    normalMatrix[0] = (a11 * a22 - a12 * a21) * invDet;
-    normalMatrix[1] = (a02 * a21 - a01 * a22) * invDet;
-    normalMatrix[2] = (a01 * a12 - a02 * a11) * invDet;
-    normalMatrix[3] = 0;
+  _renderFaces(transformedVertices) {
+    for (let i = 0; i < this.modelData.faces.length; i++) {
+      const face = this.modelData.faces[i];
 
-    normalMatrix[4] = (a12 * a20 - a10 * a22) * invDet;
-    normalMatrix[5] = (a00 * a22 - a02 * a20) * invDet;
-    normalMatrix[6] = (a02 * a10 - a00 * a12) * invDet;
-    normalMatrix[7] = 0;
+      // Backface culling
+      if (this.backfaceCullingEnabled) {
+        const v0 = transformedVertices[face[0]];
+        const v1 = transformedVertices[face[1]];
+        const v2 = transformedVertices[face[2]];
 
-    normalMatrix[8] = (a10 * a21 - a11 * a20) * invDet;
-    normalMatrix[9] = (a01 * a20 - a00 * a21) * invDet;
-    normalMatrix[10] = (a00 * a11 - a01 * a10) * invDet;
-    normalMatrix[11] = 0;
+        const edge1 = { x: v1.x - v0.x, y: v1.y - v0.y };
+        const edge2 = { x: v2.x - v0.x, y: v2.y - v0.y };
+        const screenNormal = edge1.x * edge2.y - edge1.y * edge2.x;
 
-    normalMatrix[12] = 0;
-    normalMatrix[13] = 0;
-    normalMatrix[14] = 0;
-    normalMatrix[15] = 1;
+        if (screenNormal >= 0) continue;
+      }
 
-    return normalMatrix;
+      // Triangular a face
+      for (let j = 1; j < face.length - 1; j++) {
+        const triangle = [face[0], face[j], face[j + 1]];
+        this._renderTriangle(transformedVertices, triangle, i);
+      }
+    }
+  }
+
+  _renderTriangle(transformedVertices, triangle, faceIndex) {
+    const v0 = transformedVertices[triangle[0]];
+    const v1 = transformedVertices[triangle[1]];
+    const v2 = transformedVertices[triangle[2]];
+
+    // Ordenar vértices por Y
+    let verts = [
+      { ...v0, index: triangle[0] },
+      { ...v1, index: triangle[1] },
+      { ...v2, index: triangle[2] },
+    ];
+    verts.sort((a, b) => a.y - b.y);
+
+    // Implementar algoritmo Scanline
+    this._scanlineTriangle(verts, faceIndex);
+  }
+
+  _scanlineTriangle(verts, faceIndex) {
+    const [v0, v1, v2] = verts;
+
+    // Parte superior do triângulo
+    for (let y = Math.ceil(v0.y); y <= Math.floor(v1.y); y++) {
+      if (y >= 0 && y < this.height) {
+        const t = (y - v0.y) / (v2.y - v0.y);
+        const t1 = (y - v0.y) / (v1.y - v0.y);
+
+        const x1 = v0.x + t * (v2.x - v0.x);
+        const z1 = v0.z + t * (v2.z - v0.z);
+
+        const x2 = v0.x + t1 * (v1.x - v0.x);
+        const z2 = v0.z + t1 * (v1.z - v0.z);
+
+        this._scanlineRow(y, x1, z1, x2, z2, verts, faceIndex);
+      }
+    }
+
+    // Parte inferior do triângulo
+    for (let y = Math.ceil(v1.y); y <= Math.floor(v2.y); y++) {
+      if (y >= 0 && y < this.height) {
+        const t = (y - v0.y) / (v2.y - v0.y);
+        const t1 = (y - v1.y) / (v2.y - v1.y);
+
+        const x1 = v0.x + t * (v2.x - v0.x);
+        const z1 = v0.z + t * (v2.z - v0.z);
+
+        const x2 = v1.x + t1 * (v2.x - v1.x);
+        const z2 = v1.z + t1 * (v2.z - v1.z);
+
+        this._scanlineRow(y, x1, z1, x2, z2, verts, faceIndex);
+      }
+    }
+  }
+
+  _scanlineRow(y, x1, z1, x2, z2, verts, faceIndex) {
+    if (x1 > x2) {
+      [x1, x2] = [x2, x1];
+      [z1, z2] = [z2, z1];
+    }
+
+    const startX = Math.max(0, Math.ceil(x1));
+    const endX = Math.min(this.width - 1, Math.floor(x2));
+
+    for (let x = startX; x <= endX; x++) {
+      const t = x2 - x1 > 0.0001 ? (x - x1) / (x2 - x1) : 0;
+      const z = z1 + t * (z2 - z1);
+
+      const pixelIndex = y * this.width + x;
+
+      // Z-buffer test
+      if (!this.zBufferEnabled || z < this.zBuffer[pixelIndex]) {
+        if (this.zBufferEnabled) {
+          this.zBuffer[pixelIndex] = z;
+        }
+
+        // Calcular cor
+        const color = this._calculatePixelColor(x, y, z, verts, faceIndex);
+
+        // Escrever pixel
+        const bufferIndex = pixelIndex * 4;
+        this.pixelBuffer[bufferIndex] = Math.floor(color[0] * 255);
+        this.pixelBuffer[bufferIndex + 1] = Math.floor(color[1] * 255);
+        this.pixelBuffer[bufferIndex + 2] = Math.floor(color[2] * 255);
+        this.pixelBuffer[bufferIndex + 3] = 255;
+      }
+    }
+  }
+
+  _calculatePixelColor(x, y, z, verts, faceIndex) {
+    if (!this.lightingEnabled) {
+      return this.faceColor;
+    }
+
+    const [v0, v1, v2] = verts;
+
+    // Calcular coordenadas baricêntricas
+    const area = (v1.x - v0.x) * (v2.y - v0.y) - (v2.x - v0.x) * (v1.y - v0.y);
+    const w0 = ((v1.x - x) * (v2.y - y) - (v2.x - x) * (v1.y - y)) / area;
+    const w1 = ((v2.x - x) * (v0.y - y) - (v0.x - x) * (v2.y - y)) / area;
+    const w2 = 1 - w0 - w1;
+
+    // Interpolar posição no espaço do mundo
+    const worldPos = [
+      w0 * v0.worldX + w1 * v1.worldX + w2 * v2.worldX,
+      w0 * v0.worldY + w1 * v1.worldY + w2 * v2.worldY,
+      w0 * v0.worldZ + w1 * v1.worldZ + w2 * v2.worldZ,
+    ];
+
+    if (this.lightingType === "flat") {
+      // Flat shading - usar normal da face
+      const normal = [
+        this.modelData.faceNormals[faceIndex * 3],
+        this.modelData.faceNormals[faceIndex * 3 + 1],
+        this.modelData.faceNormals[faceIndex * 3 + 2],
+      ];
+      return this._calculateLighting(worldPos, normal);
+    } else if (this.lightingType === "gouraud") {
+      // Gouraud shading - interpolar cores dos vértices
+      const c0 = this._calculateVertexLighting(v0.index);
+      const c1 = this._calculateVertexLighting(v1.index);
+      const c2 = this._calculateVertexLighting(v2.index);
+
+      return [
+        w0 * c0[0] + w1 * c1[0] + w2 * c2[0],
+        w0 * c0[1] + w1 * c1[1] + w2 * c2[1],
+        w0 * c0[2] + w1 * c1[2] + w2 * c2[2],
+      ];
+    } else {
+      // phong
+      // Phong shading - interpolar normais
+      const n0 = this._getVertexNormal(v0.index);
+      const n1 = this._getVertexNormal(v1.index);
+      const n2 = this._getVertexNormal(v2.index);
+
+      const normal = [
+        w0 * n0[0] + w1 * n1[0] + w2 * n2[0],
+        w0 * n0[1] + w1 * n1[1] + w2 * n2[1],
+        w0 * n0[2] + w1 * n1[2] + w2 * n2[2],
+      ];
+
+      // Normalizar
+      const len = Math.sqrt(
+        normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]
+      );
+      if (len > 0) {
+        normal[0] /= len;
+        normal[1] /= len;
+        normal[2] /= len;
+      }
+
+      return this._calculateLighting(worldPos, normal);
+    }
+  }
+
+  _getVertexNormal(index) {
+    const idx = index * 3;
+    return [
+      this.modelData.vertexNormals[idx],
+      this.modelData.vertexNormals[idx + 1],
+      this.modelData.vertexNormals[idx + 2],
+    ];
+  }
+
+  _calculateVertexLighting(index) {
+    const idx = index * 3;
+    const worldPos = [
+      this.modelData.verticesActual[idx],
+      this.modelData.verticesActual[idx + 1],
+      this.modelData.verticesActual[idx + 2],
+    ];
+    const normal = this._getVertexNormal(index);
+    return this._calculateLighting(worldPos, normal);
+  }
+
+  _calculateLighting(position, normal) {
+    // Vetor da luz
+    const lightDir = [
+      this.lightPosition[0] - position[0],
+      this.lightPosition[1] - position[1],
+      this.lightPosition[2] - position[2],
+    ];
+
+    // Normalizar
+    const lightLen = Math.sqrt(
+      lightDir[0] * lightDir[0] +
+        lightDir[1] * lightDir[1] +
+        lightDir[2] * lightDir[2]
+    );
+    if (lightLen > 0) {
+      lightDir[0] /= lightLen;
+      lightDir[1] /= lightLen;
+      lightDir[2] /= lightLen;
+    }
+
+    // Componente difusa
+    const diff = Math.max(
+      0,
+      normal[0] * lightDir[0] +
+        normal[1] * lightDir[1] +
+        normal[2] * lightDir[2]
+    );
+
+    // Vetor de visão
+    const viewDir = [
+      this.viewPosition[0] - position[0],
+      this.viewPosition[1] - position[1],
+      this.viewPosition[2] - position[2],
+    ];
+
+    // Normalizar
+    const viewLen = Math.sqrt(
+      viewDir[0] * viewDir[0] +
+        viewDir[1] * viewDir[1] +
+        viewDir[2] * viewDir[2]
+    );
+    if (viewLen > 0) {
+      viewDir[0] /= viewLen;
+      viewDir[1] /= viewLen;
+      viewDir[2] /= viewLen;
+    }
+
+    // Vetor de reflexão
+    const dotNL =
+      normal[0] * lightDir[0] +
+      normal[1] * lightDir[1] +
+      normal[2] * lightDir[2];
+    const reflect = [
+      2 * dotNL * normal[0] - lightDir[0],
+      2 * dotNL * normal[1] - lightDir[1],
+      2 * dotNL * normal[2] - lightDir[2],
+    ];
+
+    // Componente especular
+    const spec = Math.pow(
+      Math.max(
+        0,
+        reflect[0] * viewDir[0] +
+          reflect[1] * viewDir[1] +
+          reflect[2] * viewDir[2]
+      ),
+      32
+    );
+
+    // Combinar componentes
+    const ambient = 0.3;
+    const diffuse = 0.6;
+    const specular = 0.3;
+
+    return [
+      this.faceColor[0] * (ambient + diffuse * diff) + specular * spec,
+      this.faceColor[1] * (ambient + diffuse * diff) + specular * spec,
+      this.faceColor[2] * (ambient + diffuse * diff) + specular * spec,
+    ];
+  }
+
+  _renderWireframe(transformedVertices) {
+    const edgeSet = new Set();
+
+    for (let i = 0; i < this.modelData.faces.length; i++) {
+      const face = this.modelData.faces[i];
+
+      // Verificar se a face é visível (para ocultar linhas)
+      let faceVisible = true;
+      if (this.fillFaces && this.backfaceCullingEnabled) {
+        const v0 = transformedVertices[face[0]];
+        const v1 = transformedVertices[face[1]];
+        const v2 = transformedVertices[face[2]];
+
+        const edge1 = { x: v1.x - v0.x, y: v1.y - v0.y };
+        const edge2 = { x: v2.x - v0.x, y: v2.y - v0.y };
+        const screenNormal = edge1.x * edge2.y - edge1.y * edge2.x;
+
+        faceVisible = screenNormal > 0;
+      }
+
+      if (!faceVisible) continue;
+
+      // Desenhar arestas da face
+      for (let j = 0; j < face.length; j++) {
+        const v1 = face[j];
+        const v2 = face[(j + 1) % face.length];
+
+        // Evitar desenhar a mesma aresta duas vezes
+        const edgeKey = v1 < v2 ? `${v1}-${v2}` : `${v2}-${v1}`;
+        if (!edgeSet.has(edgeKey)) {
+          edgeSet.add(edgeKey);
+          this._drawLine(
+            transformedVertices[v1],
+            transformedVertices[v2],
+            [0, 0, 0]
+          );
+        }
+      }
+    }
+  }
+
+  _drawLine(v1, v2, color) {
+    let x0 = Math.round(v1.x);
+    let y0 = Math.round(v1.y);
+    let x1 = Math.round(v2.x);
+    let y1 = Math.round(v2.y);
+
+    const dx = Math.abs(x1 - x0);
+    const dy = Math.abs(y1 - y0);
+    const sx = x0 < x1 ? 1 : -1;
+    const sy = y0 < y1 ? 1 : -1;
+    let err = dx - dy;
+
+    // Interpolação de Z
+    const totalDist = Math.sqrt(dx * dx + dy * dy);
+
+    while (true) {
+      if (x0 >= 0 && x0 < this.width && y0 >= 0 && y0 < this.height) {
+        // Calcular Z interpolado
+        const t =
+          totalDist > 0
+            ? Math.sqrt((x0 - v1.x) * (x0 - v1.x) + (y0 - v1.y) * (y0 - v1.y)) /
+              totalDist
+            : 0;
+        const z = v1.z + t * (v2.z - v1.z);
+
+        const pixelIndex = y0 * this.width + x0;
+
+        // Verificar Z-buffer para linhas ocultas
+        if (!this.zBufferEnabled || z < this.zBuffer[pixelIndex] + 0.001) {
+          const bufferIndex = pixelIndex * 4;
+          this.pixelBuffer[bufferIndex] = color[0] * 255;
+          this.pixelBuffer[bufferIndex + 1] = color[1] * 255;
+          this.pixelBuffer[bufferIndex + 2] = color[2] * 255;
+          this.pixelBuffer[bufferIndex + 3] = 255;
+        }
+      }
+
+      if (x0 === x1 && y0 === y1) break;
+
+      const e2 = 2 * err;
+      if (e2 > -dy) {
+        err -= dy;
+        x0 += sx;
+      }
+      if (e2 < dx) {
+        err += dx;
+        y0 += sy;
+      }
+    }
   }
 
   _renderAxes() {
-    const gl = this.gl;
+    const origin = this._transformPoint([0, 0, 0]);
+    const xAxis = this._transformPoint([1, 0, 0]);
+    const yAxis = this._transformPoint([0, 1, 0]);
+    const zAxis = this._transformPoint([0, 0, 1]);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.axisBuffers.vbo);
-    const stride = 6 * Float32Array.BYTES_PER_ELEMENT;
+    // Desenhar eixos
+    this._drawLine(origin, xAxis, [1, 0, 0]); // X - vermelho
+    this._drawLine(origin, yAxis, [0, 1, 0]); // Y - verde
+    this._drawLine(origin, zAxis, [0, 0, 1]); // Z - azul
+  }
 
-    gl.vertexAttribPointer(
-      this.activeProgram.aPosition,
-      3,
-      gl.FLOAT,
-      false,
-      stride,
-      0
-    );
-    gl.enableVertexAttribArray(this.activeProgram.aPosition);
+  _transformPoint(point) {
+    const v = [point[0], point[1], point[2], 1];
+    const mvpMatrix = Matrix.multiply(this.projectionMatrix, Matrix.identity());
+    const transformed = this._multiplyMatrixVector(mvpMatrix, v);
 
-    gl.vertexAttribPointer(
-      this.activeProgram.aNormal,
-      3,
-      gl.FLOAT,
-      false,
-      stride,
-      3 * Float32Array.BYTES_PER_ELEMENT
-    );
-    gl.enableVertexAttribArray(this.activeProgram.aNormal);
+    if (Math.abs(transformed[3]) > 0.0001) {
+      transformed[0] /= transformed[3];
+      transformed[1] /= transformed[3];
+      transformed[2] /= transformed[3];
+    }
 
-    // Usar matriz identidade para os eixos
-    gl.uniformMatrix4fv(
-      this.activeProgram.uTransformMatrix,
-      false,
-      Matrix.identity()
-    );
-
-    // Desabilitar iluminação para os eixos
-    gl.uniform1i(this.activeProgram.uLightingEnabled, 0);
-
-    // Renderizar eixo X - vermelho
-    gl.uniform3fv(this.activeProgram.uFaceColor, [1, 0, 0]);
-    gl.drawArrays(gl.LINES, 0, 2);
-
-    // Renderizar eixo Y - verde
-    gl.uniform3fv(this.activeProgram.uFaceColor, [0, 1, 0]);
-    gl.drawArrays(gl.LINES, 2, 2);
-
-    // Renderizar eixo Z - azul
-    gl.uniform3fv(this.activeProgram.uFaceColor, [0, 0, 1]);
-    gl.drawArrays(gl.LINES, 4, 2);
+    return {
+      x: (transformed[0] + 1) * 0.5 * this.width,
+      y: (1 - transformed[1]) * 0.5 * this.height,
+      z: transformed[2],
+    };
   }
 
   _drawLightIndicator2D() {
@@ -772,30 +746,10 @@ class Renderer {
     const ctx = this.solzinhoCanvas.getContext("2d");
     ctx.clearRect(0, 0, this.solzinhoCanvas.width, this.solzinhoCanvas.height);
 
-    // Transforma luz para NDC
-    const model = this.transformMatrix;
-    const proj = this.projectionMatrix;
-    let [x, y, z] = this.lightPosition;
-    const v = [x, y, z, 1];
-    let mv = [0, 0, 0, 0];
-    for (let i = 0; i < 4; i++)
-      mv[i] =
-        model[i] * v[0] +
-        model[i + 4] * v[1] +
-        model[i + 8] * v[2] +
-        model[i + 12] * v[3];
-    let mp = [0, 0, 0, 0];
-    for (let i = 0; i < 4; i++)
-      mp[i] =
-        proj[i] * mv[0] +
-        proj[i + 4] * mv[1] +
-        proj[i + 8] * mv[2] +
-        proj[i + 12] * mv[3];
-    let sx = mp[0] / mp[3];
-    let sy = mp[1] / mp[3];
-
-    const cx = ((sx + 1) / 2) * this.solzinhoCanvas.width;
-    const cy = ((1 - sy) / 2) * this.solzinhoCanvas.height;
+    // Transformar luz para coordenadas de tela
+    const lightPoint = this._transformPoint(this.lightPosition);
+    const cx = lightPoint.x;
+    const cy = lightPoint.y;
 
     ctx.save();
     ctx.globalAlpha = 0.95;
