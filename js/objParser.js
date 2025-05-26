@@ -1,6 +1,3 @@
-/**
- * Parser para arquivos OBJ
- */
 class OBJParser {
   constructor() {
     this.reset();

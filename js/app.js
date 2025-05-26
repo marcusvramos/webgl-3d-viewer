@@ -199,6 +199,14 @@ class App {
         this.renderer.render();
       });
     }
+
+    const showLightIndicatorCheckbox =
+      document.getElementById("showLightIndicator");
+    if (showLightIndicatorCheckbox) {
+      showLightIndicatorCheckbox.addEventListener("change", (e) => {
+        this.renderer.setShowLightIndicator(e.target.checked);
+      });
+    }
   }
 
   _setProjection(projectionType) {

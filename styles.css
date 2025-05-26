@@ -214,22 +214,6 @@ main {
   background-color: #e05555;
 }
 
-/* Container do Canvas */
-.canvas-container {
-  position: relative;
-  width: 100%;
-  height: 500px;
-  background-color: white;
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow);
-  overflow: hidden;
-}
-
-#glCanvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
 
 /* Indicador de Carregamento */
 .loading-indicator {
@@ -490,7 +474,7 @@ footer {
 
 .controls-row .btn {
   padding: 8px 14px;
-  font-size: 0.85rem; 
+  font-size: 0.85rem;
   flex: 1 1 110px;
   max-width: 140px;
 }
@@ -592,4 +576,35 @@ footer {
   border-radius: 50%;
   background: #007bff;
   cursor: pointer;
+}
+
+.canvas-container {
+  position: relative;
+  width: 100%;
+  height: 500px;
+  background-color: white;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+#glCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  background-color: #f2f2f2;
+}
+
+
+#solzinho {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
 }

@@ -9,7 +9,8 @@ class Renderer {
     this.height = 0;
 
     this.showAxes = true;
-    this.showWireframe = true; // Nova propriedade para controlar wireframe
+    this.showWireframe = true;
+    this.showLightIndicator = true;
     this.modelData = null;
     this.transformMatrix = Matrix.identity();
     this.projectionMatrix = Matrix.identity();
@@ -31,9 +32,18 @@ class Renderer {
     this.lightingType = "flat";
     this.movingLight = false;
     this.solzinhoCanvas = document.getElementById("solzinho");
-    this.viewPosition = [0, 0, -1]; // Observador fixo em Z
+    this.viewPosition = [0, 0, -1];
 
     this.init();
+  }
+
+  setShowLightIndicator(show) {
+    this.showLightIndicator = show;
+    if (!show) {
+      this._clearLightIndicator();
+    } else if (this.modelData) {
+      this.render();
+    }
   }
 
   init() {
@@ -283,8 +293,11 @@ class Renderer {
     this.imageData.data.set(this.pixelBuffer);
     this.ctx.putImageData(this.imageData, 0, 0);
 
-    // Renderizar indicador de luz
-    this._drawLightIndicator2D();
+    if (this.showLightIndicator) {
+      this._drawLightIndicator2D();
+    } else {
+      this._clearLightIndicator();
+    }
   }
 
   _transformVertices() {
@@ -825,5 +838,11 @@ class Renderer {
     ctx.strokeStyle = "#FFC400";
     ctx.stroke();
     ctx.restore();
+  }
+
+  _clearLightIndicator() {
+    if (!this.solzinhoCanvas) return;
+    const ctx = this.solzinhoCanvas.getContext("2d");
+    ctx.clearRect(0, 0, this.solzinhoCanvas.width, this.solzinhoCanvas.height);
   }
 }
