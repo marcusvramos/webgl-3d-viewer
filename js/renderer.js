@@ -11,6 +11,7 @@ class Renderer {
     this.showAxes = true;
     this.showWireframe = true;
     this.showLightIndicator = true;
+    this.lightFollowsObject = true;
     this.modelData = null;
     this.transformMatrix = Matrix.identity();
     this.projectionMatrix = Matrix.identity();
@@ -32,18 +33,9 @@ class Renderer {
     this.lightingType = "flat";
     this.movingLight = false;
     this.solzinhoCanvas = document.getElementById("solzinho");
-    this.viewPosition = [0, 0, -1];
+    this.viewPosition = [0, 0, -1]; // Observador fixo em Z
 
     this.init();
-  }
-
-  setShowLightIndicator(show) {
-    this.showLightIndicator = show;
-    if (!show) {
-      this._clearLightIndicator();
-    } else if (this.modelData) {
-      this.render();
-    }
   }
 
   init() {
@@ -200,6 +192,22 @@ class Renderer {
     this.render();
   }
 
+  // Método para controlar visibilidade do solzinho
+  setShowLightIndicator(show) {
+    this.showLightIndicator = show;
+    if (!show) {
+      this._clearLightIndicator();
+    } else if (this.modelData) {
+      this.render();
+    }
+  }
+
+  // Método para controlar se a luz segue o objeto
+  setLightFollowsObject(follows) {
+    this.lightFollowsObject = follows;
+    this.render();
+  }
+
   loadModel(modelData) {
     this.modelData = modelData;
 
@@ -293,6 +301,7 @@ class Renderer {
     this.imageData.data.set(this.pixelBuffer);
     this.ctx.putImageData(this.imageData, 0, 0);
 
+    // Renderizar indicador de luz apenas se habilitado
     if (this.showLightIndicator) {
       this._drawLightIndicator2D();
     } else {
@@ -592,11 +601,16 @@ class Renderer {
   }
 
   _calculateLighting(position, normal) {
+    // Determinar posição efetiva da luz
+    const effectiveLightPos = this.lightFollowsObject
+      ? this._transformLightToObjectSpace()
+      : this.lightPosition;
+
     // Vetor da luz
     const lightDir = [
-      this.lightPosition[0] - position[0],
-      this.lightPosition[1] - position[1],
-      this.lightPosition[2] - position[2],
+      effectiveLightPos[0] - position[0],
+      effectiveLightPos[1] - position[1],
+      effectiveLightPos[2] - position[2],
     ];
 
     // Normalizar
@@ -679,6 +693,39 @@ class Renderer {
         this.faceColor[2] * (ambient + diffuse * diff) + specular * spec
       ),
     ];
+  }
+
+  // Método auxiliar para transformar a luz para o espaço do objeto
+  _transformLightToObjectSpace() {
+    // Aplicar rotação inversa à posição da luz
+    const invRotation = this._getInverseRotationMatrix(this.transformMatrix);
+    const lightVec = [
+      this.lightPosition[0],
+      this.lightPosition[1],
+      this.lightPosition[2],
+      0,
+    ];
+    const transformedLight = this._multiplyMatrixVector(invRotation, lightVec);
+
+    return [transformedLight[0], transformedLight[1], transformedLight[2]];
+  }
+
+  // Extrair e inverter apenas a parte de rotação da matriz
+  _getInverseRotationMatrix(matrix) {
+    // Transpor a matriz de rotação (inversa de uma matriz ortogonal)
+    const result = Matrix.identity();
+
+    result[0] = matrix[0];
+    result[1] = matrix[4];
+    result[2] = matrix[8];
+    result[4] = matrix[1];
+    result[5] = matrix[5];
+    result[6] = matrix[9];
+    result[8] = matrix[2];
+    result[9] = matrix[6];
+    result[10] = matrix[10];
+
+    return result;
   }
 
   _renderWireframe(transformedVertices) {

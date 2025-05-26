@@ -157,6 +157,22 @@ class App {
       });
     }
 
+    // Checkbox para mostrar/ocultar o indicador de luz (solzinho)
+    const showLightIndicatorCheckbox = document.getElementById("showLightIndicator");
+    if (showLightIndicatorCheckbox) {
+      showLightIndicatorCheckbox.addEventListener("change", (e) => {
+        this.renderer.setShowLightIndicator(e.target.checked);
+      });
+    }
+
+    // Checkbox para controlar se a luz segue o objeto
+    const lightFollowsObjectCheckbox = document.getElementById("lightFollowsObject");
+    if (lightFollowsObjectCheckbox) {
+      lightFollowsObjectCheckbox.addEventListener("change", (e) => {
+        this.renderer.setLightFollowsObject(e.target.checked);
+      });
+    }
+
     // Checkbox de backface culling
     const backfaceCullingCheckbox = document.getElementById(
       "enableBackfaceCulling"
@@ -197,14 +213,6 @@ class App {
         ];
         this.renderer.faceColor = rgb;
         this.renderer.render();
-      });
-    }
-
-    const showLightIndicatorCheckbox =
-      document.getElementById("showLightIndicator");
-    if (showLightIndicatorCheckbox) {
-      showLightIndicatorCheckbox.addEventListener("change", (e) => {
-        this.renderer.setShowLightIndicator(e.target.checked);
       });
     }
   }

@@ -97,6 +97,12 @@
             </div>
             <div>
               <label>
+                <input type="checkbox" id="lightFollowsObject" checked />
+                Luz Segue Objeto
+              </label>
+            </div>
+            <div>
+              <label>
                 <input type="checkbox" id="enableBackfaceCulling" checked />
                 Remover Faces Ocultas
               </label>
@@ -120,8 +126,10 @@
               <input type="color" id="faceColor" value="#b0b6de" />
             </div>
             <div style="margin-top: 10px; font-size: 12px; color: #666">
-              <b>Dica:</b> Arraste a luz mantendo pressionado <b>L</b> sobre o
-              canvas
+              <b>Dica:</b>
+              <br />• <b>Luz Segue Objeto:</b> A luz roda junto com o modelo
+              <br />• <b>Luz Fixa:</b> A luz permanece fixa no espaço <br />•
+              Arraste a luz mantendo <b>L</b> pressionado
             </div>
           </div>
           <div class="info-card" id="controls">
@@ -165,7 +173,7 @@
           </div>
           <div class="canvas-container" style="position: relative">
             <canvas id="glCanvas"></canvas>
-            <canvas id="solzinho" class="solzinho"></canvas>
+            <canvas id="solzinho"></canvas>
             <div id="loadingIndicator" class="loading-indicator hidden">
               <div class="loading-spinner"></div>
               Carregando modelo...
@@ -209,6 +217,8 @@
               <li><b>Segure L + Mova o mouse:</b> Posicionar luz XY</li>
               <li><b>Segure L + Scroll:</b> Posicionar luz Z</li>
               <li>Escolha entre iluminação Flat, Gouraud ou Phong</li>
+              <li><b>Luz Segue Objeto:</b> A luz roda junto com o modelo</li>
+              <li><b>Luz Fixa:</b> A luz permanece fixa no espaço</li>
             </ul>
           </div>
         </div>
@@ -235,6 +245,8 @@
               <li>Ative/desative wireframe (linhas do modelo)</li>
               <li>Ative/desative preenchimento de faces</li>
               <li>Ative/desative iluminação</li>
+              <li>Ative/desative indicador de luz (☀️)</li>
+              <li>Controle se a luz segue o objeto ou fica fixa</li>
               <li>Ative/desative remoção de faces ocultas</li>
               <li>Ative/desative Z-Buffer</li>
               <li>Personalize a cor do modelo</li>
