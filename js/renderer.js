@@ -33,7 +33,9 @@ class Renderer {
     this.lightingType = "flat";
     this.movingLight = false;
     this.solzinhoCanvas = document.getElementById("solzinho");
-    this.viewPosition = [0, 0, -1]; // Observador fixo em Z
+    this.viewPosition = [0, 0, -1];
+
+    this.specularN = 32;
 
     this.init();
   }
@@ -330,7 +332,7 @@ class Renderer {
       // Aplicar MVP completa para obter coordenadas de clipping
       const transformed4 = this._multiplyMatrixVector(mvpMatrix, v);
 
-      // Para Z-buffer: usar Z após transformação mas antes da divisão perspectiva
+      // Usar Z após transformação mas antes da divisão perspectiva
       let zForBuffer = transformed4[2];
 
       // Perspectiva divide
@@ -375,7 +377,7 @@ class Renderer {
   }
 
   _renderFaces(transformedVertices) {
-    // Criar lista de faces com profundidade média para ordenação
+    // Lista de faces com profundidade média para ordenação
     const facesWithDepth = [];
 
     for (let i = 0; i < this.modelData.faces.length; i++) {
@@ -428,6 +430,23 @@ class Renderer {
     const v1 = transformedVertices[triangle[1]];
     const v2 = transformedVertices[triangle[2]];
 
+    let faceColor = null;
+    if (this.lightingEnabled && this.lightingType === "flat") {
+      const centerWorldPos = [
+        (v0.worldX + v1.worldX + v2.worldX) / 3,
+        (v0.worldY + v1.worldY + v2.worldY) / 3,
+        (v0.worldZ + v1.worldZ + v2.worldZ) / 3,
+      ];
+
+      const normal = [
+        this.modelData.faceNormals[faceIndex * 3],
+        this.modelData.faceNormals[faceIndex * 3 + 1],
+        this.modelData.faceNormals[faceIndex * 3 + 2],
+      ];
+
+      faceColor = this._calculateLighting(centerWorldPos, normal);
+    }
+
     // Ordenar vértices por Y
     let verts = [
       { ...v0, index: triangle[0] },
@@ -436,11 +455,11 @@ class Renderer {
     ];
     verts.sort((a, b) => a.y - b.y);
 
-    // Implementar algoritmo Scanline
-    this._scanlineTriangle(verts, faceIndex);
+    // Passar a cor pré-calculada para o scanline
+    this._scanlineTriangle(verts, faceIndex, faceColor);
   }
 
-  _scanlineTriangle(verts, faceIndex) {
+  _scanlineTriangle(verts, faceIndex, preCalculatedColor = null) {
     const [v0, v1, v2] = verts;
 
     // Parte superior do triângulo
@@ -455,7 +474,16 @@ class Renderer {
         const x2 = v0.x + t1 * (v1.x - v0.x);
         const z2 = v0.z + t1 * (v1.z - v0.z);
 
-        this._scanlineRow(y, x1, z1, x2, z2, verts, faceIndex);
+        this._scanlineRow(
+          y,
+          x1,
+          z1,
+          x2,
+          z2,
+          verts,
+          faceIndex,
+          preCalculatedColor
+        );
       }
     }
 
@@ -471,12 +499,21 @@ class Renderer {
         const x2 = v1.x + t1 * (v2.x - v1.x);
         const z2 = v1.z + t1 * (v2.z - v1.z);
 
-        this._scanlineRow(y, x1, z1, x2, z2, verts, faceIndex);
+        this._scanlineRow(
+          y,
+          x1,
+          z1,
+          x2,
+          z2,
+          verts,
+          faceIndex,
+          preCalculatedColor
+        );
       }
     }
   }
 
-  _scanlineRow(y, x1, z1, x2, z2, verts, faceIndex) {
+  _scanlineRow(y, x1, z1, x2, z2, verts, faceIndex, preCalculatedColor = null) {
     if (x1 > x2) {
       [x1, x2] = [x2, x1];
       [z1, z2] = [z2, z1];
@@ -497,8 +534,10 @@ class Renderer {
           this.zBuffer[pixelIndex] = z;
         }
 
-        // Calcular cor
-        const color = this._calculatePixelColor(x, y, z, verts, faceIndex);
+        // Usar cor pré-calculada para flat shading ou calcular normalmente
+        const color =
+          preCalculatedColor ||
+          this._calculatePixelColor(x, y, z, verts, faceIndex);
 
         // Escrever pixel
         const bufferIndex = pixelIndex * 4;
@@ -671,7 +710,7 @@ class Renderer {
           reflect[1] * viewDir[1] +
           reflect[2] * viewDir[2]
       ),
-      32
+      this.specularN
     );
 
     // Combinar componentes

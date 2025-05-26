@@ -158,7 +158,8 @@ class App {
     }
 
     // Checkbox para mostrar/ocultar o indicador de luz (solzinho)
-    const showLightIndicatorCheckbox = document.getElementById("showLightIndicator");
+    const showLightIndicatorCheckbox =
+      document.getElementById("showLightIndicator");
     if (showLightIndicatorCheckbox) {
       showLightIndicatorCheckbox.addEventListener("change", (e) => {
         this.renderer.setShowLightIndicator(e.target.checked);
@@ -166,7 +167,8 @@ class App {
     }
 
     // Checkbox para controlar se a luz segue o objeto
-    const lightFollowsObjectCheckbox = document.getElementById("lightFollowsObject");
+    const lightFollowsObjectCheckbox =
+      document.getElementById("lightFollowsObject");
     if (lightFollowsObjectCheckbox) {
       lightFollowsObjectCheckbox.addEventListener("change", (e) => {
         this.renderer.setLightFollowsObject(e.target.checked);
@@ -212,6 +214,15 @@ class App {
           parseInt(hex.substr(5, 2), 16) / 255,
         ];
         this.renderer.faceColor = rgb;
+        this.renderer.render();
+      });
+    }
+
+    const specularNInput = document.getElementById("specularN");
+    if (specularNInput) {
+      specularNInput.addEventListener("input", (e) => {
+        const n = parseInt(e.target.value) || 32;
+        this.renderer.specularN = Math.max(1, Math.min(256, n));
         this.renderer.render();
       });
     }
